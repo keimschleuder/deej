@@ -9,17 +9,10 @@
 slider_mapping:
   0: master
   1: deej.current
-  2: itunes.exe
-  3: discord.exe
-  4: 
-    - edge.exe
-    - chrome.exe
-  5: 
-    - LIDAR.exe
-    - Among Us.exe
-  6: system
-  7: deej.unmapped
-  8: mic
+  2: discord.exe
+  3: itunes.exe
+  4: deej.unmapped
+  5: mic
 
 # supported button list https://github.com/micmonay/keybd_event/blob/master/keybd_windows.go (scroll down)
 # be sure to convert hex values to decimal (hex values start with 0x)
@@ -39,9 +32,6 @@ button_mapping:
   3: 4222 # F16
   4: 4223 # F17
   5: 4224 # F18
-  6: 4225 # F19
-  7: 4226 # F20
-  8: 4227 # F21
 
 # set this to true if you want the controls inverted (i.e. top is 0%, bottom is 100%)
 invert_sliders: false

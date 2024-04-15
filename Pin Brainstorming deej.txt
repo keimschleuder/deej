@@ -1,14 +1,10 @@
 Pin Barinstorming
 
-0	Master			master
+0	Master			    master
 1	aktuelles Fenster	deej.current
-2	Musik			itunes.exe
-3	Discord			discord.exe
-4	Games			lidar.exe; Among Us.exe
-5	Browser			chrome.exe; edge.exe
-6	
-7	System			system
-8	alles andere		deej.unmapped
-9	Mic			mic
+2	Musik			    discord.exe
+3	Discord			    itunes.exe
+4   unmapped            deej.unmapped
+5   Input               mic
 
 Board Bestell-Nr.: 2587755 - 62
