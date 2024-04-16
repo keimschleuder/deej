@@ -44,7 +44,7 @@ type SliderMoveEvent struct {
 	PercentValue float32
 }
 
-// SliderMoveEvent represents a single slider move captured by deej
+// ButtonEvent represents a single slider button captured by deej
 type ButtonEvent struct {
 	ButtonID int
 	Value    int
