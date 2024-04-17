@@ -2,8 +2,11 @@ const int NUM_SLIDERS = 6;
 const int analogInputs[NUM_SLIDERS] = {A0, A1, A3, A6, A7, A8};
 const int NUM_BUTTONS = 6;
 const int buttonInputs[NUM_BUTTONS] = {0, 1, 2, 3, 5, 7};
+const float noiseReduction = 0.02
 
 int analogSliderValues[NUM_SLIDERS];
+float percentSliderValues[NUM_SLIDERS];
+int lastSliderValues[NUM_SLIDERS];
 int buttonValues[NUM_BUTTONS];
 
 void setup() {
@@ -23,6 +26,7 @@ void loop() {
   sendSliderValues(); // Actually send data (all the time)
 //   printSliderValues(); // For debug
   delay(10);
+  lastSliderValues = analogSliderValues;
 }
 
 void updateSliderValues() {
@@ -30,8 +34,16 @@ void updateSliderValues() {
     analogSliderValues[i] = analogRead(analogInputs[i]);
   }
 
-  // Convert to percentages
-  // Moise cancelling
+  // Convert to percentages + Noise cancelling
+  percentSliverValues = []
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    float dirtyFloat = analogSliderValues[i] / 1023.0
+    float normalized = normalizeValue(dirtyFloat) // Two decimal digits
+
+    if (hasChanged(normalized, lastSliderValues[i])) {
+      percentSliderValues[i] = normalized
+    }
+  }
   // Screen updating
 
   for (int i = 0; i < NUM_BUTTONS; i++) {
@@ -65,6 +77,27 @@ void sendSliderValues() {
   }
 
   Serial.println(builtString);
+}
+
+bool hasChanged(int new, int old) {
+  if (abs(old - new) >= noiseReduction) {
+    return true;
+  }
+
+  if ((almostEqual(new, 1.0) && old != 1.0) || almostEqual(new, 0.0) && old != 0.0) {
+    return true
+  }
+
+  return false;
+}
+
+bool almostEqual(float a, float b) {
+  return abs(a - b) > 0.00001
+}
+
+float normalizeValue(float v) {
+  float result = floor(v * 100) / 100.0;
+  return result;
 }
 
 void printSliderValues() {
