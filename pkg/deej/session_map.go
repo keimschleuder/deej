@@ -3,13 +3,13 @@ package deej
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"strconv"
 
-	"github.com/omriharel/deej/pkg/deej/util"
 	"github.com/micmonay/keybd_event"
+	"github.com/omriharel/deej/pkg/deej/util"
 	"github.com/thoas/go-funk"
 	"go.uber.org/zap"
 )
@@ -287,16 +287,15 @@ func (m *sessionMap) handleSliderMoveEvent(event SliderMoveEvent) {
 	}
 }
 
-
 func (m *sessionMap) handleButtonEvent(event ButtonEvent) {
 	if event.Value == 0 {
 		kb, err := keybd_event.NewKeyBonding()
-		
+
 		i, err := strconv.Atoi(m.deej.config.ButtonMapping[strconv.Itoa(event.ButtonID)][0])
 		kb.SetKeys(i)
-		m.logger.Debugw("Triggering button","keycodeint",i)
+		m.logger.Debugw("Triggering button", "keycodeint", i)
 		// m.logger.Debug(0xAD + 0xFFF)
-		err = kb.Launching() 
+		err = kb.Launching()
 		if err != nil {
 			panic(err)
 		}
