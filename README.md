@@ -24,5 +24,22 @@ Mini build log: https://imgur.com/a/baIDppz
 ![Finished build](https://i.imgur.com/neM2xle.jpg)
 ![Finished build2](https://i.imgur.com/moRmNFJ.jpg)
 
+# Builds from omriharel and his community
 
+  One possibility to build. With some example function assigned. It is possible to assign multiple apps to one slider within the `config.yaml`. Some other possibilities are the `master`, `mic`, `deej.current` and `deej.unmapped`. 
+  
+  Where `deej.current` controls only the current window and `deej.unmapped` controls everything, which is not mapped to a slider.
 
+![Annotated Build](/assets/build-3d-annotated.png)
+
+  The Scematic is also available here. But for detailed instructions visit [omriharels repository](https://github.com/omriharel/deej?tab=readme-ov-file#slider-mapping-configuration)
+
+![Scematic](/assets/schematic.png)
+
+  Builds from omriharels community are located in [this folder](/assets/community-builds/)
+
+  Here you can find some of my personal favorite ones:
+
+![bgrier](/assets/community-builds/bgrier.jpg)
+![dimitar](/assets/community-builds/dimitar.jpg)
+![ginjah](/assets/community-builds/ginjah.jpg)
