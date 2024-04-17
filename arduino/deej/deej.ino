@@ -29,6 +29,11 @@ void updateSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     analogSliderValues[i] = analogRead(analogInputs[i]);
   }
+
+  // Convert to percentages
+  // Moise cancelling
+  // Screen updating
+
   for (int i = 0; i < NUM_BUTTONS; i++) {
     buttonValues[i] = digitalRead(buttonInputs[i]);
   }
