@@ -30,22 +30,22 @@ void loop() {
 }
 
 void updateSliderValues() {
+  // Sliders
+  percentSliverValues = [];
   for (int i = 0; i < NUM_SLIDERS; i++) {
     analogSliderValues[i] = analogRead(analogInputs[i]);
-  }
 
-  // Convert to percentages + Noise cancelling
-  percentSliverValues = []
-  for (int i = 0; i < NUM_SLIDERS; i++) {
-    float dirtyFloat = analogSliderValues[i] / 1023.0
-    float normalized = normalizeValue(dirtyFloat) // Two decimal digits
+    // Convert to percentages + Noise cancelling
+    float dirtyFloat = analogSliderValues[i] / 1023.0;
+    float normalized = normalizeValue(dirtyFloat); // Two decimal digits
 
     if (hasChanged(normalized, lastSliderValues[i])) {
-      percentSliderValues[i] = normalized
+      percentSliderValues[i] = normalized;
     }
   }
   // Screen updating
 
+  // Buttons
   for (int i = 0; i < NUM_BUTTONS; i++) {
     buttonValues[i] = digitalRead(buttonInputs[i]);
   }
