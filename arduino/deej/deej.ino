@@ -58,13 +58,13 @@ void sendSliderValues() {
   /* slightly overengineering this stuff. */
   bool sliderChanged = false;
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    builtString += "s";
     if (percentSliderValues[i] != 0) {
       if (sliderChanged) {
         builtString += "|";
       }
       sliderChanged = true;
 
+      builtString += "s";
       builtString += String((int)i);
       builtString += "x";
       builtString += String((float)percentSliderValues[i]);

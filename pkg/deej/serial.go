@@ -269,35 +269,12 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, line string) {
 		}
 	}
 
-	numSliders := len(splitLineSliders)
-	numButtons := len(splitLineButtons)
-
-	// update our slider count, if needed - this will send slider move events for all
-	if numSliders != sio.lastKnownNumSliders {
-		logger.Infow("Detected sliders", "amount", numSliders)
-		sio.lastKnownNumSliders = numSliders
-		sio.currentSliderPercentValues = make([]float32, numSliders)
-
-		// reset everything to be an impossible value to force the slider move event later
-		for idx := range sio.currentSliderPercentValues {
-			sio.currentSliderPercentValues[idx] = -1.0
-		}
-	}
-
-	if numButtons != sio.lastKnownNumButtons {
-		logger.Infow("Detected buttons", "amount", numButtons)
-		sio.lastKnownNumButtons = numButtons
-		sio.currentButtonValues = make([]int, numButtons)
-
-		// reset everything to be an impossible value to force the slider move event later
-		for idx := range sio.currentButtonValues {
-			sio.currentButtonValues[idx] = -1.0
-		}
-	}
-
 	// for each slider:
 	moveEvents := []SliderMoveEvent{}
 	for sliderIdx, stringValue := range splitLineSliders {
+
+		// TODO: Make the Funktion recognize the 2x0.58 format -> split funktion with the x and converting the first and the secont to int seperately
+		// 		 Test it -> Buy an Arduino...
 
 		// logger.Debug(stringValue);
 
