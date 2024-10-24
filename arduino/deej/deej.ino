@@ -2,7 +2,7 @@ const int NUM_SLIDERS = 6;
 const int analogInputs[NUM_SLIDERS] = { A0, A1, A3, A6, A7, A8 };
 const int NUM_BUTTONS = 6;
 const int buttonInputs[NUM_BUTTONS] = { 0, 1, 2, 3, 5, 7 };
-const float noiseReduction = 0.02
+const float noiseReduction = 0.02;
 
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
