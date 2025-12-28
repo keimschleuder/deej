@@ -7,11 +7,11 @@
 
   And the [Button Fork](https://github.com/Miodec/deej)
 
-# How to
+# Installing
 
- - Upload the Arduino code to your board (be sure to change the pin definitions).
- - Download the `deej-release.exe` file and `config.yaml` from the [release section](https://github.com/Miodec/deej/releases/tag/compile) (`deej-dev` will show a debug console window when launched)
- - If you run into any issues, feel free to ask in the [Deej Discord Server](https://discord.gg/nf88NJu)
+## Mute Current Window
+
+I use [this programm to mute the current window](https://github.com/tfourj/MuteActiveWindow). Thy have detailled instuctions on how to install it. Make shure to set the hotkey to F13.
 
 # Case files from Miodec
 
