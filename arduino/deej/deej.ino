@@ -1,7 +1,8 @@
 const int NUM_SLIDERS = 6;
-const int analogInputs[NUM_SLIDERS] = { A0, A1, A3, A6, A7, A8 };
+const int analogInputs[NUM_SLIDERS] = { A0, A1, A3, A3, A4, A5 };
+const int sliderOutputs[NUM_SLIDERS] = { 9, 8, 7, 6, 5, 4 };
 const int NUM_BUTTONS = 6;
-const int buttonInputs[NUM_BUTTONS] = { 0, 1, 2, 3, 5, 7 };
+const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 3, 2 };
 const float noiseReduction = 0.02;
 
 float percentSliderValues[NUM_SLIDERS];
