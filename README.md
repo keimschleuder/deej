@@ -12,6 +12,7 @@
 ## Mute Current Window
 
 I use [this programm to mute the current window](https://github.com/tfourj/MuteActiveWindow). Thy have detailled instuctions on how to install it. Make shure to set the hotkey to F13.
+Also make it [run on startup](https://stackoverflow.com/questions/41723490/how-to-build-ahk-scripts-automatically-on-startup).
 
 # Case files from Miodec
 
