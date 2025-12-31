@@ -11,49 +11,93 @@ const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 1, 0 };
 
 const char* sliderNames[] = {"Master Volume", "Aktuelles Fenter", "Discord", "Musik", "Alles andere", "Mikrofon"};
 
-TFT TFTscreen = TFT(cs, dc, rst);
+TFT Screen = TFT(cs, dc, rst);
 uint8_t red = 255;
 uint8_t green = 255;
 uint8_t blue = 255;
 
+int lastAction = 0;
+
+enum ScreenState {
+  IDLE, 
+  PERCENTAGE, 
+  SPECIAL
+};
+
+ScreenState currentScreenState = IDLE;
+
 void displayPercentage(uint8_t percentage, uint8_t slider) {
+  // Clear Screen
+  Screen.fillScreen(Screen.Color565(0, 0, 0));
+
   // Textfarbe weiss
-  TFTscreen.stroke(255, 255, 255);
+  Screen.stroke(255, 255, 255);
   // Rechteck-Rahmen
   for(int i = 0; i < 3; i++) {
-    TFTscreen.drawRect(5 + i, 5 + i, 150 - (2 * i), 118 - (2 * i), TFTscreen.Color565(255, 255, 255));
+    Screen.drawRect(5 + i, 5 + i, 150 - (2 * i), 118 - (2 * i), Screen.Color565(255, 255, 255));
   }
   // Prozentzahl anzeigen
-  TFTscreen.textSize(4);
+  Screen.textSize(4);
   
   // Alte Zahl löschen (schwarzes Rechteck über den Bereich)
-  TFTscreen.fill(0, 0, 0);
-  TFTscreen.noStroke();
-  TFTscreen.rect(20, 40, 110, 45);
+  Screen.fill(0, 0, 0);
+  Screen.noStroke();
+  Screen.rect(20, 40, 110, 45);
   
   // Neue Zahl schreiben
-  TFTscreen.stroke(255, 255, 255);
+  Screen.stroke(255, 255, 255);
   char buffer[4];
   sprintf(buffer, "%02d", percentage);
-  TFTscreen.text(buffer, 30, 55);
-  TFTscreen.text("%", 102, 55);
+  Screen.text(buffer, 30, 55);
+  Screen.text("%", 102, 55);
 
   // Label schreiben
-  TFTscreen.textSize(1);
+  Screen.textSize(1);
   if(slider < 6) {
-    TFTscreen.text(sliderNames[slider], 30, 40);
+    Screen.text(sliderNames[slider], 30, 40);
   }
+
+  currentScreenState = PERCENTAGE;
+}
+
+void drawIdle() {
+  // Clear Screen
+  Screen.fillScreen(Screen.Color565(0, 0, 0));
+
+  // TODO: Coverart
+  Screen.fillRect(30, 0, 100, 100, Screen.Color565(0, 0, 255));
+
+  // TODO: Is playing?
+  uint16_t color = Screen.Color565(255, 255, 255);
+  uint8_t yTop = 107;
+  uint8_t yMiddle = 113;
+  uint8_t yBottom = 119;
+  // Last Track
+  Screen.fillTriangle(30, yMiddle, 36, yTop, 36, yBottom, color);
+  Screen.fillTriangle(35, yMiddle, 41, yTop, 41, yBottom, color);
+
+  // Play/Pause
+  Screen.fillTriangle(82, yMiddle, 76, yTop, 76, yBottom, color);
+  Screen.fillRect(83, yTop, 2, 13, color);
+
+  // Next Track
+  Screen.fillTriangle(125, yMiddle, 119, yTop, 119, yBottom, color);
+  Screen.fillTriangle(130, yMiddle, 124, yTop, 124, yBottom, color);
+
+  currentScreenState = IDLE;
 }
 
 void setup() {
   delay(1000);
 
   // Setup Screen
-  TFTscreen.begin();
+  Screen.begin();
   //Hintergrund: Schwarz
-  TFTscreen.background(0, 0, 0);
+  Screen.background(0, 0, 0);
   //Textfarbe: Weiß
-  TFTscreen.stroke(blue, green, red);
+  Screen.stroke(blue, green, red);
+
+  drawIdle();
 
   // Setup Buttons
   for (int i = 0; i < NUM_BUTTONS; i++) {
@@ -62,10 +106,18 @@ void setup() {
 }
 
 void loop() {
+  // Read button states
   for (int i = 0; i < NUM_BUTTONS; i++) {
     if (digitalRead(buttonInputs[i])) {
       displayPercentage(50, i);
+      lastAction = millis();
     }
   }
+
+  // Draw Idle Screen, when last Action is too far in the past
+  if (millis() - lastAction >= 2000 && currentScreenState != IDLE) {
+    drawIdle();
+  }
+
   delay(100);
 }
