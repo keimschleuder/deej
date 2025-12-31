@@ -1,8 +1,24 @@
+#include <TFT.h>
+#include <SPI.h>
+
+// Display Constants
+#define cs   17
+#define dc   2
+#define rst  3
+
+const char* sliderNames[] = {"Master Volume", "Aktuelles Fenter", "Discord", "Musik", "Alles andere", "Mikrofon"};
+
+TFT TFTscreen = TFT(cs, dc, rst);
+uint8_t red = 255;
+uint8_t green = 255;
+uint8_t blue = 255;
+
+// Slider and Button Constants
 const int NUM_SLIDERS = 6;
 const int analogInputs[NUM_SLIDERS] = { A0, A1, A3, A3, A4, A5 };
 const int sliderOutputs[NUM_SLIDERS] = { 9, 8, 7, 6, 5, 4 };
 const int NUM_BUTTONS = 6;
-const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 3, 2 };
+const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 1, 0 };
 const float noiseReduction = 0.02;
 
 float percentSliderValues[NUM_SLIDERS];
@@ -10,14 +26,27 @@ float lastSliderValues[NUM_SLIDERS];
 bool buttonValues[NUM_BUTTONS];
 
 void setup() {
+  delay(1000);
+
+  // Display Setup
+  TFTscreen.begin();
+  TFTscreen.background(0, 0, 0);
+  TFTscreen.stroke(blue, green, red);
+
+  // Slider and Button Setup
   for (int i = 0; i < NUM_SLIDERS; i++) {
     pinMode(analogInputs[i], INPUT);
   }
 
-  for (int i = 0; i < NUM_BUTTONS; i++) {
-    pinMode(buttonInputs[i], INPUT_PULLUP);
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    pinMode(sliderOutputs[i], OUTPUT);
   }
 
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    pinMode(buttonInputs[i], INPUT);
+  }
+
+  // Serial Setup
   Serial.begin(9600);
 }
 
@@ -25,13 +54,14 @@ void loop() {
   updateSliderValues();
   sendSliderValues(); // Actually send data (all the time)
 //   printSliderValues(); // For debug
-  lastSliderValues = percentSliderValues;
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    lastSliderValues[i] = percentSliderValues[i];
+  }
   delay(10);
 }
 
 void updateSliderValues() {
   // Sliders
-  percentSliverValues = [];
   for (int i = 0; i < NUM_SLIDERS; i++) {
     int analogValue = analogRead(analogInputs[i]);
 
@@ -81,7 +111,7 @@ void sendSliderValues() {
     builtString += String("|");
   }
 
-  changed = false
+  changed = false;
   for (int i = 0; i < NUM_BUTTONS; i++) {
     if (buttonValues[i]) {
       if (changed) {
@@ -104,20 +134,20 @@ void sendSliderValues() {
   Serial.println(builtString);
 }
 
-bool hasChanged(int new, int old) {
-  if (abs(old - new) >= noiseReduction) {
+bool hasChanged(int updated, int old) {
+  if (abs(old - updated) >= noiseReduction) {
     return true;
   }
 
-  if ((almostEqual(new, 1.0) && old != 1.0) || almostEqual(new, 0.0) && old != 0.0) {
-    return true
+  if ((almostEqual(updated, 1.0) && old != 1.0) || almostEqual(updated, 0.0) && old != 0.0) {
+    return true;
   }
 
   return false;
 }
 
 bool almostEqual(float a, float b) {
-  return abs(a - b) > 0.01
+  return (abs(a - b) > noiseReduction);
 }
 
 float normalizeValue(float v) {
@@ -127,7 +157,7 @@ float normalizeValue(float v) {
 
 void printSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    String printedString = String("Slider #") + String(i + 1) + String(": ") + String(analogSliderValues[i]) + String(" mV");
+    String printedString = String("Slider #") + String(i + 1) + String(": ") + String(percentSliderValues[i]) + String(" mV");
     Serial.write(printedString.c_str());
 
     if (i < NUM_SLIDERS - 1) {
