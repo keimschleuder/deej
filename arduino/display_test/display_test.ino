@@ -25,7 +25,7 @@ void displayPercentage(uint8_t percentage) {
   TFTscreen.stroke(255, 255, 255);
   // Rechteck-Rahmen
   for(int i = 0; i < 3; i++) {
-    TFTscreen.drawRect(5 + i, 5 + i, 150 - (2 * i), 118 - (2 * i), 255);
+    TFTscreen.drawRect(5 + i, 5 + i, 150 - (2 * i), 118 - (2 * i), TFTscreen.Color565(255, 255, 255));
   }
   // Prozentzahl anzeigen
   TFTscreen.textSize(4);
@@ -40,7 +40,7 @@ void displayPercentage(uint8_t percentage) {
   char buffer[4];
   sprintf(buffer, "%02d", percentage);
   TFTscreen.text(buffer, 30, 50);
-  TFTscreen.text("%", 100, 50);
+  TFTscreen.text("%", 102, 50);
 }
 
 void loop() {
