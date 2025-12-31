@@ -11,18 +11,18 @@
 
 ## Mute Current Window
 
-I use [this programm to mute the current window](https://github.com/tfourj/MuteActiveWindow). Thy have detailled instuctions on how to install it. Make shure to set the hotkey to F13.
+  I use [this programm to mute the current window](https://github.com/tfourj/MuteActiveWindow). Thy have detailled instuctions on how to install it. Make shure to set the hotkey to F13.
 
 # Case files from Miodec
 
-Case files available in the [/models](https://github.com/Miodec/deej/tree/master/models) directory
+  Case files available in the [/models](https://github.com/Miodec/deej/tree/master/models) directory
 
 # Build from Miodec
 
-Mini build log: https://imgur.com/a/baIDppz
+  Mini build log: https://imgur.com/a/baIDppz
 
-![Finished build](https://i.imgur.com/neM2xle.jpg)
-![Finished build2](https://i.imgur.com/moRmNFJ.jpg)
+  ![Finished build](https://i.imgur.com/neM2xle.jpg)
+  ![Finished build2](https://i.imgur.com/moRmNFJ.jpg)
 
 # Builds from omriharel and his community
 
