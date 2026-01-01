@@ -44,3 +44,5 @@ Also make it [run on startup](https://stackoverflow.com/questions/41723490/how-t
 ![bgrier](/assets/community-builds/bgrier.jpg)
 ![dimitar](/assets/community-builds/dimitar.jpg)
 ![ginjah](/assets/community-builds/ginjah.jpg)
+
+  You can find more Community Builds [here](/community.md)
