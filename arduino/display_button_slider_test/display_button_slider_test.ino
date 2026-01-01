@@ -7,11 +7,11 @@
 #define rst  3
 
 const int NUM_SLIDERS = 1;
+const int NUM_RELAIS = 2;
 const int analogInputs[NUM_SLIDERS] = { A0 };
-const int sliderOutputs[NUM_SLIDERS] = { 9 };
+const int sliderOutputs[NUM_RELAIS] = { 9, 8 };
 const int NUM_BUTTONS = 6;
 const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 1, 0 };
-const float noiseReduction = 0.02;
 
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
@@ -51,7 +51,7 @@ void setup() {
     pinMode(analogInputs[i], INPUT);
   }
 
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_RELAIS; i++) {
     pinMode(sliderOutputs[i], OUTPUT);
   }
 
@@ -66,12 +66,38 @@ void loop() {
   for (int i = 0; i < NUM_BUTTONS; i++) {
     if (digitalRead(buttonInputs[i])) {
       displayPercentage(50, i);
+      
+      // tmp
+      switch (i)
+      {
+      case 0:
+        sliderGoTo(50, 0);
+        break;
+      case 1:
+        sliderGoTo(25, 0);
+        break;
+      case 2:
+        sliderGoTo(75, 0);
+        break;
+      case 3:
+        sliderGoTo(100, 0);
+        break;
+      case 4:
+        sliderGoTo(0, 0);
+        break;
+      case 5:
+        sliderGoTo(30, 0);
+        break;
+      default:
+        break;
+      }
+
       lastAction = millis();
     }
   }
 
   // Handle Sliders
-  // updateSliderValues();
+  updateSliderValues();
 
   // Draw Idle Screen, when last Action is too far in the past
   if (millis() - lastAction >= 2000 && currentScreenState != IDLE) {
@@ -86,20 +112,37 @@ void loop() {
 void updateSliderValues() {
   // Sliders
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    int analogValue = analogRead(analogInputs[i]);
+    int normalized = readSlider(i);
 
-    // Convert to percentages + Noise cancelling
-    float dirtyFloat = analogValue / 1023.0;
-    float normalized = normalizeValue(dirtyFloat);  // Two decimal digits
-
-    if (hasChanged(normalized, lastSliderValues[i])) {
+    if (normalized != lastSliderValues[i]) {
       percentSliderValues[i] = normalized;
+      lastSliderValues[i] = normalized;
       // Screen updating
-      displayPercentage(percentSliderValues[i], i);
+      if (currentScreenState == PERCENTAGE) {
+        updatePercentage(normalized, i);
+      } else {
+        displayPercentage(normalized, i);
+      }
       lastAction = millis();
     } else {
       percentSliderValues[i] = 0;
     }
+  }
+}
+
+void sliderGoTo(uint8_t aim, uint8_t slider) {
+  for (int i = 0; i < 3; i++) {
+    int curr = readSlider(slider);
+    while (curr != aim && curr != aim + 1 && curr != aim - 1) {
+      if (curr < aim) {
+        steer(slider, true);
+      } else {
+        steer(slider, false);
+      }
+      curr = readSlider(slider);
+    }
+    haltSliders();
+    delay(250);
   }
 }
 
@@ -114,6 +157,15 @@ void displayPercentage(uint8_t percentage, uint8_t slider) {
   for(int i = 0; i < 3; i++) {
     Screen.drawRect(5 + i, 5 + i, 150 - (2 * i), 118 - (2 * i), Screen.Color565(255, 255, 255));
   }
+
+  updatePercentage(percentage, slider);
+
+  currentScreenState = PERCENTAGE;
+}
+
+void updatePercentage(uint8_t percentage, uint8_t slider) {
+  // Textfarbe weiss
+  Screen.stroke(255, 255, 255);
   // Prozentzahl anzeigen
   Screen.textSize(4);
   
@@ -134,8 +186,6 @@ void displayPercentage(uint8_t percentage, uint8_t slider) {
   if(slider < 6) {
     Screen.text(sliderNames[slider], 30, 40);
   }
-
-  currentScreenState = PERCENTAGE;
 }
 
 void drawIdle() {
@@ -166,23 +216,59 @@ void drawIdle() {
 }
 
 // Helper Functions
-bool hasChanged(int updated, int old) {
-  if (abs(old - updated) >= noiseReduction) {
-    return true;
-  }
-
-  if ((almostEqual(updated, 1.0) && old != 1.0) || almostEqual(updated, 0.0) && old != 0.0) {
-    return true;
-  }
-
-  return false;
+int normalizeValue(float v) {
+  return round(v * 100);  // Auf 2 Nachkommastellen kürzen: 0.99856 -> 0.99 
 }
 
-bool almostEqual(float a, float b) {
-  return (abs(a - b) > noiseReduction);
+int readSlider(uint8_t slider) {
+  int analogValue = analogRead(analogInputs[slider]);
+
+  // Convert to percentages + Noise cancelling
+  float dirtyFloat = analogValue / 1023.0;
+  return normalizeValue(dirtyFloat);  // Two decimal digits
 }
 
-float normalizeValue(float v) {
-  float result = floor(v * 100) / 100.0;  // Auf 2 Nachkommastellen kürzen: 0.99856 -> 0.99
-  return result;
+void steer(uint8_t slider, bool dir) {
+  // True = towards 100 %
+  bool outputs[NUM_RELAIS];
+  switch (slider)
+  {
+  case 0:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  case 1:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  case 2:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  case 3:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  case 4:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  case 5:
+    outputs[0] = 1;
+    outputs[1] = dir;
+    break;
+  default:
+    outputs[0] = 0;
+    outputs[1] = 0;
+    break;
+  }
+  for (int i = 0; i < NUM_RELAIS; i++) {
+    digitalWrite(sliderOutputs[i], outputs[i]);
+  }
+}
+
+void haltSliders() {
+  for (int i = 0; i < NUM_RELAIS; i++) {
+    digitalWrite(sliderOutputs[i], 0);
+  }
 }

@@ -33,18 +33,9 @@ void setup() {
 }
 
 void loop() {
-  if (millis() - lastAction >= 2000 && currentScreenState != IDLE) {
-    Serial.println("Idle");
-  }
-
-  // updateSliderValues();
-  digitalWrite(sliderOutputs[0], 1);
-  delay(1000);
-  digitalWrite(sliderOutputs[1], 1);
-  delay(1000);
-  digitalWrite(sliderOutputs[1], 0);
-  delay(1000);
-  digitalWrite(sliderOutputs[0], 0);
+  int aim = 25;
+  int slider = 0;
+  sliderGoTo(aim, slider);
   delay(1000);
 }
 
@@ -56,41 +47,92 @@ void updateSliderValues() {
     // Convert to percentages + Noise cancelling
     float dirtyFloat = analogValue / 1023.0;
     float normalized = normalizeValue(dirtyFloat);  // Two decimal digits
-    Serial.println(analogValue);
+    // Serial.println(dirtyFloat);
 
-    /* if (hasChanged(normalized, lastSliderValues[i])) {
+    if (normalized != lastSliderValues[i]) {
       percentSliderValues[i] = normalized;
+      lastSliderValues[i] = normalized;
       // Screen updating
       displayPercentage(normalized, i);
       lastAction = millis();
     } else {
       percentSliderValues[i] = 0;
-    } */
+    }
   }
 }
 
-void displayPercentage(float percentage, uint8_t slider) {
-  Serial.println(percentage, slider);
+void sliderGoTo(uint8_t aim, uint8_t slider) {
+  int curr = readSlider(slider);
+  while (curr != aim && curr != aim + 1 && curr != aim - 1) {
+    if (curr < aim) {
+      steer(slider, true);
+    } else {
+      steer(slider, false);
+    }
+    curr = readSlider(slider);
+    Serial.println(curr);
+  }
+  haltSliders();
+}
+
+void displayPercentage(uint8_t percentage, uint8_t slider) {
+  Serial.println(percentage);
 }
 
 // Helper Functions
-bool hasChanged(int updated, int old) {
-  if (abs(old - updated) >= noiseReduction) {
-    return true;
-  }
-
-  if ((almostEqual(updated, 1.0) && old != 1.0) || almostEqual(updated, 0.0) && old != 0.0) {
-    return true;
-  }
-
-  return false;
+int normalizeValue(float v) {
+  return round(v * 100);  // Auf 2 Nachkommastellen kürzen: 0.99856 -> 0.99 
 }
 
-bool almostEqual(float a, float b) {
-  return (abs(a - b) > noiseReduction);
+int readSlider(uint8_t slider) {
+  int analogValue = analogRead(analogInputs[slider]);
+
+  // Convert to percentages + Noise cancelling
+  float dirtyFloat = analogValue / 1023.0;
+  return normalizeValue(dirtyFloat);  // Two decimal digits
 }
 
-float normalizeValue(float v) {
-  float result = floor(v * 100) / 100.0;  // Auf 2 Nachkommastellen kürzen: 0.99856 -> 0.99
-  return result;
+void steer(uint8_t slider, bool dir) {
+  // True = towards 100 %
+  bool outputs[NUM_RELAIS];
+  switch (slider)
+  {
+  case 0:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 1:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 2:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 3:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 4:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 5:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  default:
+    outputs[0] = false;
+    outputs[1] = false;
+    break;
+  }
+  for (int i = 0; i < NUM_RELAIS; i++) {
+    digitalWrite(sliderOutputs[i], outputs[i]);
+  }
+}
+
+void haltSliders() {
+  for (int i = 0; i < NUM_RELAIS; i++) {
+    digitalWrite(sliderOutputs[i], 0);
+  }
 }
