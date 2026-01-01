@@ -16,7 +16,7 @@ Also make it [run on startup](https://stackoverflow.com/questions/41723490/how-t
 
 # Case files from Miodec
 
-  Case files available in the [/models](https://github.com/Miodec/deej/tree/master/models) directory
+  Case files available in the [/assets/models](/assets/models/) directory
 
 # Build from Miodec
 
