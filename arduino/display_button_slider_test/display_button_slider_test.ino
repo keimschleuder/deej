@@ -134,18 +134,26 @@ void updateSliderValues() {
 }
 
 void sliderGoTo(uint8_t aim, uint8_t slider) {
-  for (int i = 0; i < 5; i++) {
-    int curr = readSlider(slider);
-    while (isEqual(curr, aim)) {
-      if (curr < aim) {
-        steer(slider, true);
-      } else {
-        steer(slider, false);
+  if (aim != 100) {
+    for (int i = 0; i < 3; i++) {
+      int curr = readSlider(slider);
+      while (isEqual(curr, aim)) {
+        if (curr < aim) {
+          steer(slider, true);
+        } else {
+          steer(slider, false);
+        }
+        curr = readSlider(slider);
       }
-      curr = readSlider(slider);
+      haltSliders();
+      delay(100);
     }
-    haltSliders();
+  } else {
+    steer(slider, true);
     delay(250);
+    digitalWrite(sliderOutputs[0], false);
+    delay(50);
+    haltSliders();
   }
   displayPercentage(aim, slider);
   lastSliderValues[slider] = aim;
@@ -247,32 +255,32 @@ void steer(uint8_t slider, bool dir) {
   switch (slider)
   {
   case 0:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 1:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 2:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 3:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 4:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 5:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   default:
-    outputs[0] = 0;
-    outputs[1] = 0;
+    outputs[0] = false;
+    outputs[1] = false;
     break;
   }
   for (int i = 0; i < NUM_RELAIS; i++) {
@@ -282,6 +290,6 @@ void steer(uint8_t slider, bool dir) {
 
 void haltSliders() {
   for (int i = 0; i < NUM_RELAIS; i++) {
-    digitalWrite(sliderOutputs[i], 0);
+    digitalWrite(sliderOutputs[i], false);
   }
 }
