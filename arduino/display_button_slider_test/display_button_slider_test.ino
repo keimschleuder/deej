@@ -131,7 +131,7 @@ void updateSliderValues() {
 }
 
 void sliderGoTo(uint8_t aim, uint8_t slider) {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 5; i++) {
     int curr = readSlider(slider);
     while (hasChanged(curr, aim)) { // TODO: Make this just accept 100% and 0% at those values
       if (curr < aim) {
@@ -217,9 +217,9 @@ void drawIdle() {
 
 // Helper Functions
 bool hasChanged(uint8_t curr, uint8_t aim) {
-  if (aim == 100) { return curr == 100; }
-  if (aim == 0) { return curr == 0; }  
-  return curr != aim && curr != aim + 1 && curr != aim - 1;
+  if (aim == 100) { return curr != 100; }
+  else if (aim == 0) { return curr != 0; }  
+  else { return curr != aim && curr != aim + 1 && curr != aim - 1; }
 }
 
 int normalizeValue(float v) {
