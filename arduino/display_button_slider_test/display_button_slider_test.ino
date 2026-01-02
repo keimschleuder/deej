@@ -12,6 +12,7 @@ const int analogInputs[NUM_SLIDERS] = { A0 };
 const int sliderOutputs[NUM_RELAIS] = { 9, 8 };
 const int NUM_BUTTONS = 6;
 const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 1, 0 };
+const float noiseReduction = 1;
 
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
@@ -133,7 +134,7 @@ void updateSliderValues() {
 void sliderGoTo(uint8_t aim, uint8_t slider) {
   for (int i = 0; i < 5; i++) {
     int curr = readSlider(slider);
-    while (hasChanged(curr, aim)) { // TODO: Make this just accept 100% and 0% at those values
+    while (isEqual(curr, aim)) {
       if (curr < aim) {
         steer(slider, true);
       } else {
@@ -200,6 +201,7 @@ void drawIdle() {
   uint8_t yTop = 107;
   uint8_t yMiddle = 113;
   uint8_t yBottom = 119;
+
   // Last Track
   Screen.fillTriangle(30, yMiddle, 36, yTop, 36, yBottom, color);
   Screen.fillTriangle(35, yMiddle, 41, yTop, 41, yBottom, color);
@@ -216,7 +218,7 @@ void drawIdle() {
 }
 
 // Helper Functions
-bool hasChanged(uint8_t curr, uint8_t aim) {
+bool isEqual(uint8_t curr, uint8_t aim) {
   if (aim == 100) { return curr != 100; }
   else if (aim == 0) { return curr != 0; }  
   else { return curr != aim && curr != aim + 1 && curr != aim - 1; }
