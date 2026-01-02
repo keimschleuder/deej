@@ -122,10 +122,7 @@ void updateSliderValues() {
       secondLastSliderValues[i] = lastSliderValues[i];
       lastSliderValues[i] = normalized;
       // Screen updating
-      if (currentScreenState == PERCENTAGE) {
-        if (lastSliderActive == i) { updatePercentageSameSlider(normalized); }
-        else { updatePercentage(normalized, i); }
-      } else { displayPercentage(normalized, i); }
+      delegateDisplay(normalized, i);
       lastAction = millis();
       lastSliderActive = i;
     } else {
@@ -157,12 +154,20 @@ void sliderGoTo(uint8_t aim, uint8_t slider) {
     haltSliders();
   }
   int curr = readSlider(slider);
-  displayPercentage(aim, slider);
+  delegateDisplay(aim, slider);
   lastSliderValues[slider] = curr;
   secondLastSliderValues[slider] = aim;
+  lastAction = millis();
 }
 
 // Display Functions
+void delegateDisplay(uint8_t percentage, uint8_t slider) {
+  if (currentScreenState == PERCENTAGE) {
+    if (lastSliderActive == slider) { updatePercentageSameSlider(percentage); }
+    else { updatePercentage(percentage, slider); }
+  } else { displayPercentage(percentage, slider); }
+}
+
 void displayPercentage(uint8_t percentage, uint8_t slider) {
   // Clear Screen
   Screen.fillScreen(Screen.Color565(0, 0, 0));
