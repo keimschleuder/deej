@@ -133,7 +133,7 @@ void updateSliderValues() {
 void sliderGoTo(uint8_t aim, uint8_t slider) {
   for (int i = 0; i < 3; i++) {
     int curr = readSlider(slider);
-    while (curr != aim && curr != aim + 1 && curr != aim - 1) { // TODO: Make this just accept 100% and 0% at those values
+    while (hasChanged(curr, aim)) { // TODO: Make this just accept 100% and 0% at those values
       if (curr < aim) {
         steer(slider, true);
       } else {
@@ -216,6 +216,12 @@ void drawIdle() {
 }
 
 // Helper Functions
+bool hasChanged(uint8_t curr, uint8_t aim) {
+  if (aim == 100) { return curr == 100; }
+  if (aim == 0) { return curr == 0; }  
+  return curr != aim && curr != aim + 1 && curr != aim - 1;
+}
+
 int normalizeValue(float v) {
   return round(v * 100);  // Auf 2 Nachkommastellen kürzen: 0.99856 -> 0.99 
 }
