@@ -16,6 +16,7 @@ const float noiseReduction = 1;
 
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
+float secondLastSliderValues[NUM_SLIDERS];
 bool buttonValues[NUM_BUTTONS];
 
 const char* sliderNames[] = {"Master Volume", "Aktuelles Fenter", "Discord", "Musik", "Alles andere", "Mikrofon"};
@@ -66,7 +67,7 @@ void loop() {
   // Read button states
   for (int i = 0; i < NUM_BUTTONS; i++) {
     if (digitalRead(buttonInputs[i])) {
-      displayPercentage(50, i);
+      // displayPercentage(50, i);
       
       // tmp
       switch (i)
@@ -112,11 +113,12 @@ void loop() {
 // Slider Functions
 void updateSliderValues() {
   // Sliders
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS; i++) { // Prevent random jiggles, while also ensuring smooth movement
     int normalized = readSlider(i);
 
-    if (normalized != lastSliderValues[i]) {
+    if (normalized != lastSliderValues[i] && normalized != secondLastSliderValues[i]) {
       percentSliderValues[i] = normalized;
+      secondLastSliderValues[i] = lastSliderValues[i];
       lastSliderValues[i] = normalized;
       // Screen updating
       if (currentScreenState == PERCENTAGE) {
@@ -132,19 +134,30 @@ void updateSliderValues() {
 }
 
 void sliderGoTo(uint8_t aim, uint8_t slider) {
-  for (int i = 0; i < 5; i++) {
-    int curr = readSlider(slider);
-    while (isEqual(curr, aim)) {
-      if (curr < aim) {
-        steer(slider, true);
-      } else {
-        steer(slider, false);
+  if (aim != 100) {
+    for (int i = 0; i < 3; i++) {
+      int curr = readSlider(slider);
+      while (isEqual(curr, aim)) {
+        if (curr < aim) {
+          steer(slider, true);
+        } else {
+          steer(slider, false);
+        }
+        curr = readSlider(slider);
       }
-      curr = readSlider(slider);
+      haltSliders();
+      delay(100);
     }
-    haltSliders();
+  } else {
+    steer(slider, true);
     delay(250);
+    digitalWrite(sliderOutputs[0], false);
+    delay(50);
+    haltSliders();
   }
+  displayPercentage(aim, slider);
+  lastSliderValues[slider] = aim;
+  secondLastSliderValues[slider] = aim;
 }
 
 // Display Functions
@@ -242,32 +255,32 @@ void steer(uint8_t slider, bool dir) {
   switch (slider)
   {
   case 0:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 1:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 2:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 3:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 4:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   case 5:
-    outputs[0] = 1;
+    outputs[0] = true;
     outputs[1] = dir;
     break;
   default:
-    outputs[0] = 0;
-    outputs[1] = 0;
+    outputs[0] = false;
+    outputs[1] = false;
     break;
   }
   for (int i = 0; i < NUM_RELAIS; i++) {
@@ -277,6 +290,6 @@ void steer(uint8_t slider, bool dir) {
 
 void haltSliders() {
   for (int i = 0; i < NUM_RELAIS; i++) {
-    digitalWrite(sliderOutputs[i], 0);
+    digitalWrite(sliderOutputs[i], false);
   }
 }
