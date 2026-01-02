@@ -133,7 +133,7 @@ void updateSliderValues() {
 void sliderGoTo(uint8_t aim, uint8_t slider) {
   for (int i = 0; i < 3; i++) {
     int curr = readSlider(slider);
-    while (curr != aim && curr != aim + 1 && curr != aim - 1) {
+    while (curr != aim && curr != aim + 1 && curr != aim - 1) { // TODO: Make this just accept 100% and 0% at those values
       if (curr < aim) {
         steer(slider, true);
       } else {
