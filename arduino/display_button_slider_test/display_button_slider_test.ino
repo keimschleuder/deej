@@ -17,6 +17,7 @@ const float noiseReduction = 1;
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
 float secondLastSliderValues[NUM_SLIDERS];
+int lastSliderActive;
 bool buttonValues[NUM_BUTTONS];
 
 const char* sliderNames[] = {"Master Volume", "Aktuelles Fenter", "Discord", "Musik", "Alles andere", "Mikrofon"};
@@ -122,11 +123,11 @@ void updateSliderValues() {
       lastSliderValues[i] = normalized;
       // Screen updating
       if (currentScreenState == PERCENTAGE) {
-        updatePercentage(normalized, i);
-      } else {
-        displayPercentage(normalized, i);
-      }
+        if (lastSliderActive == i) { updatePercentageSameSlider(normalized); }
+        else { updatePercentage(normalized, i); }
+      } else { displayPercentage(normalized, i); }
       lastAction = millis();
+      lastSliderActive = i;
     } else {
       percentSliderValues[i] = 0;
     }
@@ -155,8 +156,9 @@ void sliderGoTo(uint8_t aim, uint8_t slider) {
     delay(50);
     haltSliders();
   }
+  int curr = readSlider(slider);
   displayPercentage(aim, slider);
-  lastSliderValues[slider] = aim;
+  lastSliderValues[slider] = curr;
   secondLastSliderValues[slider] = aim;
 }
 
@@ -180,13 +182,30 @@ void displayPercentage(uint8_t percentage, uint8_t slider) {
 void updatePercentage(uint8_t percentage, uint8_t slider) {
   // Textfarbe weiss
   Screen.stroke(255, 255, 255);
-  // Prozentzahl anzeigen
-  Screen.textSize(4);
   
   // Alte Zahl löschen (schwarzes Rechteck über den Bereich)
   Screen.fill(0, 0, 0);
   Screen.noStroke();
   Screen.rect(20, 40, 110, 45);
+ 
+  updatePercentageSameSlider(percentage);
+
+  // Label schreiben
+  Screen.textSize(1);
+  if(slider < 6) {
+    Screen.text(sliderNames[slider], 30, 40);
+  }
+}
+
+void updatePercentageSameSlider(uint8_t percentage) {
+  // Textfarbe weiss
+  Screen.stroke(255, 255, 255);
+  // Prozentzahl anzeigen
+  Screen.textSize(4);
+  // Alte Zahl löschen (schwarzes Rechteck über den Bereich)
+  Screen.fill(0, 0, 0);
+  Screen.noStroke();
+  Screen.rect(30, 55, 70, 28);
   
   // Neue Zahl schreiben
   Screen.stroke(255, 255, 255);
@@ -194,12 +213,6 @@ void updatePercentage(uint8_t percentage, uint8_t slider) {
   sprintf(buffer, "%02d", percentage);
   Screen.text(buffer, 30, 55);
   Screen.text("%", 102, 55);
-
-  // Label schreiben
-  Screen.textSize(1);
-  if(slider < 6) {
-    Screen.text(sliderNames[slider], 30, 40);
-  }
 }
 
 void drawIdle() {
