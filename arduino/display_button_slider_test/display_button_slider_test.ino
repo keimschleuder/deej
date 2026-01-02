@@ -16,6 +16,7 @@ const float noiseReduction = 1;
 
 float percentSliderValues[NUM_SLIDERS];
 float lastSliderValues[NUM_SLIDERS];
+float secondLastSliderValues[NUM_SLIDERS];
 bool buttonValues[NUM_BUTTONS];
 
 const char* sliderNames[] = {"Master Volume", "Aktuelles Fenter", "Discord", "Musik", "Alles andere", "Mikrofon"};
@@ -66,7 +67,7 @@ void loop() {
   // Read button states
   for (int i = 0; i < NUM_BUTTONS; i++) {
     if (digitalRead(buttonInputs[i])) {
-      displayPercentage(50, i);
+      // displayPercentage(50, i);
       
       // tmp
       switch (i)
@@ -112,11 +113,12 @@ void loop() {
 // Slider Functions
 void updateSliderValues() {
   // Sliders
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS; i++) { // Prevent random jiggles, while also ensuring smooth movement
     int normalized = readSlider(i);
 
-    if (normalized != lastSliderValues[i]) {
+    if (normalized != lastSliderValues[i] && normalized != secondLastSliderValues[i]) {
       percentSliderValues[i] = normalized;
+      secondLastSliderValues[i] = lastSliderValues[i];
       lastSliderValues[i] = normalized;
       // Screen updating
       if (currentScreenState == PERCENTAGE) {
@@ -145,6 +147,9 @@ void sliderGoTo(uint8_t aim, uint8_t slider) {
     haltSliders();
     delay(250);
   }
+  displayPercentage(aim, slider);
+  lastSliderValues[slider] = aim;
+  secondLastSliderValues[slider] = aim;
 }
 
 // Display Functions
