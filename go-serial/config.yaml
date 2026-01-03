@@ -8,7 +8,7 @@
 # important: slider indexes start at 0, regardless of which analog pins you're using!
 slider_mapping:
   0: 
-    - discord.exe
+    - msedge.exe
     - itunes.exe
 #  0: master
 #  1: deej.current

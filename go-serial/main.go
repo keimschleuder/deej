@@ -49,10 +49,11 @@ var (
 	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
 	procGetModuleBaseNameW       = psapi.NewProc("GetModuleBaseNameW")
 
-	kb            keybd_event.KeyBonding
-	userConfig    *viper.Viper
-	sliderMapping map[string]int
-	verbose       bool
+	kb                   keybd_event.KeyBonding
+	userConfig           *viper.Viper
+	sliderMapping        map[string]int   // name -> number (for verbose/help)
+	sliderTargetsMapping map[int][]string // slider number -> list of targets
+	verbose              bool
 )
 
 func main() {
@@ -71,7 +72,7 @@ func main() {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
 
-	// Build slider mapping (reverse lookup: name -> number)
+	// Build slider mapping (name -> number) and targets mapping
 	sliderMapping = buildSliderMapping()
 
 	// Initialize keyboard
@@ -140,9 +141,11 @@ func initializeConfig() (*viper.Viper, error) {
 	return config, nil
 }
 
-// buildSliderMapping creates a reverse lookup map from slider names to numbers
+// buildSliderMapping creates mappings for verbose/help and slider targets
 func buildSliderMapping() map[string]int {
 	mapping := make(map[string]int)
+	sliderTargetsMapping = make(map[int][]string)
+
 	sliderMap := userConfig.GetStringMap(configKeySliderMapping)
 
 	for key, value := range sliderMap {
@@ -150,15 +153,43 @@ func buildSliderMapping() map[string]int {
 		if err != nil {
 			continue
 		}
-		if sliderName, ok := value.(string); ok {
-			mapping[sliderName] = sliderNum
-			if verbose {
-				fmt.Printf("Slider %d -> %s\n", sliderNum, sliderName)
+
+		var targets []string
+
+		switch v := value.(type) {
+		case string:
+			targets = []string{v}
+		case []interface{}:
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						targets = append(targets, s)
+					}
+				}
+			}
+		}
+
+		if len(targets) > 0 {
+			sliderTargetsMapping[sliderNum] = targets
+			for _, name := range targets {
+				mapping[name] = sliderNum
+				if verbose {
+					fmt.Printf("Slider %d -> %s\n", sliderNum, name)
+				}
 			}
 		}
 	}
 
 	return mapping
+}
+
+// getSliderTargets returns all target apps for a slider number
+func getSliderTargets(sliderNum int) []string {
+	if targets, exists := sliderTargetsMapping[sliderNum]; exists {
+		return targets
+	}
+	return nil
 }
 
 // Continuously read from Arduino
@@ -221,24 +252,25 @@ func parseArduinoData(data string) ArduinoMessage {
 			if err == nil && n == 2 {
 				msg.SliderValues[sliderNum] = value
 
-				// Check slider name and route to appropriate volume control
-				sliderName := getSliderName(sliderNum)
-				switch sliderName {
-				case "master":
-					go setSystemVolume(value)
-				case "mic":
-					go setMicrophoneVolume(value)
-				case "deej.current":
-					// Get process name
-					processName, err := CurrentProcessName()
-					if err != nil {
-						log.Println(err)
-					}
-					go setApplicationVolume(processName, value)
-				default:
-					// If it ends with .exe, treat it as an application name
-					if strings.HasSuffix(strings.ToLower(sliderName), ".exe") {
-						go setApplicationVolume(sliderName, value)
+				// Get all targets for this slider
+				targets := getSliderTargets(sliderNum)
+				for _, target := range targets {
+					switch target {
+					case "master":
+						go setSystemVolume(value)
+					case "mic":
+						go setMicrophoneVolume(value)
+					case "deej.current":
+						processName, err := CurrentProcessName()
+						if err != nil {
+							log.Println(err)
+							continue
+						}
+						go setApplicationVolume(processName, value)
+					default:
+						if strings.HasSuffix(strings.ToLower(target), ".exe") {
+							go setApplicationVolume(target, value)
+						}
 					}
 				}
 			}
@@ -296,17 +328,6 @@ func CurrentProcessName() (string, error) {
 	}
 
 	return syscall.UTF16ToString(buf), nil
-}
-
-// getSliderName returns the name mapped to a slider number
-func getSliderName(sliderNum int) string {
-	sliderMap := userConfig.GetStringMap(configKeySliderMapping)
-	if nameVal, exists := sliderMap[strconv.Itoa(sliderNum)]; exists {
-		if name, ok := nameVal.(string); ok {
-			return name
-		}
-	}
-	return ""
 }
 
 // setSystemVolume sets the Windows system volume (0-100)
@@ -463,14 +484,12 @@ func setApplicationVolume(processName string, percentage int) {
 				found = true
 			}
 
-			// release dispatch objects explicitly (in reverse order)
 			simpleVolumeDispatch.Release()
 			sessionControl2Dispatch.Release()
 			sessionControl.Release()
 			break
 		}
 
-		// not target -> release and continue
 		sessionControl2Dispatch.Release()
 		sessionControl.Release()
 	}
@@ -480,28 +499,16 @@ func setApplicationVolume(processName string, percentage int) {
 	}
 }
 
-// getProcessName returns the executable name for a given process ID
 func getProcessName(pid uint32) string {
-	// Simple approach: read from /proc or use Windows API
-	// For Windows, we'll use a simple approach with the process name
-	// This is a placeholder - in production you'd use Windows API calls
-
-	// For now, we'll use a simple system call
 	return getProcessNameWindows(pid)
 }
 
-// getProcessNameWindows retrieves process name on Windows
 func getProcessNameWindows(pid uint32) string {
-	// Use Windows API to get process name
-	// This requires additional Windows API calls
-	// For simplicity, we'll use a basic approach
-
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	openProcess := kernel32.NewProc("OpenProcess")
 	queryFullProcessImageName := kernel32.NewProc("QueryFullProcessImageNameW")
 	closeHandle := kernel32.NewProc("CloseHandle")
 
-	// Open process with QUERY_LIMITED_INFORMATION access
 	handle, _, _ := openProcess.Call(
 		0x1000, // PROCESS_QUERY_LIMITED_INFORMATION
 		0,
@@ -513,13 +520,12 @@ func getProcessNameWindows(pid uint32) string {
 	}
 	defer closeHandle.Call(handle)
 
-	// Get process image name
-	var size uint32 = 260 // MAX_PATH
+	var size uint32 = 260
 	buffer := make([]uint16, size)
 
 	ret, _, _ := queryFullProcessImageName.Call(
 		handle,
-		0, // Win32 path format
+		0,
 		uintptr(unsafe.Pointer(&buffer[0])),
 		uintptr(unsafe.Pointer(&size)),
 	)
@@ -528,7 +534,6 @@ func getProcessNameWindows(pid uint32) string {
 		return ""
 	}
 
-	// Convert to string and extract just the filename
 	fullPath := syscall.UTF16ToString(buffer[:size])
 	parts := strings.Split(fullPath, "\\")
 	if len(parts) > 0 {
@@ -538,7 +543,6 @@ func getProcessNameWindows(pid uint32) string {
 	return ""
 }
 
-// Send key press to Windows
 func sendKeyPress(keyCode int) {
 	kb.SetKeys(keyCode)
 	err := kb.Launching()
@@ -551,7 +555,6 @@ func sendKeyPress(keyCode int) {
 	kb.Clear()
 }
 
-// Process incoming messages from Arduino
 func processMessages(msgChan <-chan ArduinoMessage) {
 	for msg := range msgChan {
 		if verbose {
@@ -570,7 +573,6 @@ func processMessages(msgChan <-chan ArduinoMessage) {
 	}
 }
 
-// Handle user input and send commands to Arduino
 func handleUserInput(port io.ReadWriteCloser) {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -586,7 +588,6 @@ func handleUserInput(port io.ReadWriteCloser) {
 			continue
 		}
 
-		// Parse command
 		parts := strings.Fields(input)
 		cmd := strings.ToLower(parts[0])
 
@@ -623,7 +624,6 @@ func handleUserInput(port io.ReadWriteCloser) {
 	}
 }
 
-// Send command to Arduino
 func sendCommand(port io.ReadWriteCloser, command string) {
 	message := command + "\n"
 	n, err := port.Write([]byte(message))
@@ -637,7 +637,6 @@ func sendCommand(port io.ReadWriteCloser, command string) {
 	}
 }
 
-// Print available commands
 func printHelp() {
 	fmt.Println("\n=== Available Commands ===")
 	fmt.Println("  set <slider> <percentage>  - Set specific slider to percentage")
@@ -645,8 +644,9 @@ func printHelp() {
 	fmt.Println("  help                       - Show this help")
 	fmt.Println("  quit/exit/q                - Exit program")
 	fmt.Println("\nSlider Mapping:")
-	for name, num := range sliderMapping {
-		fmt.Printf("  Slider %d -> %s\n", num, name)
+	for _, num := range sliderMapping {
+		targets := getSliderTargets(num)
+		fmt.Printf("  Slider %d -> %s\n", num, strings.Join(targets, ", "))
 	}
 	fmt.Println("========================")
 }
