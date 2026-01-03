@@ -128,15 +128,6 @@ void processSerialCommand(String command) {
     return;
   }
   
-  // Check if it's a simple percentage value (backward compatibility)
-  if (command.toInt() >= 0 && command.toInt() <= 100) {
-    int percentage = command.toInt();
-    sliderGoTo(percentage, 0);
-    Serial.print("OK:SET:");
-    Serial.println(percentage);
-    return;
-  }
-  
   // Command format: CMD:PARAM1:PARAM2
   // Examples:
   //   SET:0:75    - Set slider 0 to 75%
@@ -163,7 +154,6 @@ void processSerialCommand(String command) {
     }
   }
   else if (cmd == "GET") {
-    // Request current status
     sendValues();
   }
   else if (cmd == "PING") {
