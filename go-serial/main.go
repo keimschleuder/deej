@@ -20,6 +20,7 @@ import (
 	"github.com/micmonay/keybd_event"
 	"github.com/moutend/go-wca/pkg/wca"
 	"github.com/spf13/viper"
+	"golang.org/x/sys/windows"
 )
 
 type ArduinoMessage struct {
@@ -40,10 +41,19 @@ const (
 	defaultBaudRate        = 9600
 )
 
-var kb keybd_event.KeyBonding
-var userConfig *viper.Viper
-var sliderMapping map[string]int // maps slider names (like "master") to slider numbers
-var verbose bool                 // verbose mode flag
+var (
+	user32 = windows.NewLazySystemDLL("user32.dll")
+	psapi  = windows.NewLazySystemDLL("psapi.dll")
+
+	procGetForegroundWindow      = user32.NewProc("GetForegroundWindow")
+	procGetWindowThreadProcessId = user32.NewProc("GetWindowThreadProcessId")
+	procGetModuleBaseNameW       = psapi.NewProc("GetModuleBaseNameW")
+
+	kb            keybd_event.KeyBonding
+	userConfig    *viper.Viper
+	sliderMapping map[string]int
+	verbose       bool
+)
 
 func main() {
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose output (shows all messages)")
@@ -218,6 +228,13 @@ func parseArduinoData(data string) ArduinoMessage {
 					go setSystemVolume(value)
 				case "mic":
 					go setMicrophoneVolume(value)
+				case "deej.current":
+					// Get process name
+					processName, err := CurrentProcessName()
+					if err != nil {
+						log.Println(err)
+					}
+					go setApplicationVolume(processName, value)
 				default:
 					// If it ends with .exe, treat it as an application name
 					if strings.HasSuffix(strings.ToLower(sliderName), ".exe") {
@@ -246,6 +263,39 @@ func parseArduinoData(data string) ArduinoMessage {
 	}
 
 	return msg
+}
+
+func CurrentProcessName() (string, error) {
+	hwnd, _, err := procGetForegroundWindow.Call()
+	if hwnd == 0 {
+		return "", err
+	}
+
+	var pid uint32
+	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+
+	handle, err := windows.OpenProcess(
+		windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ,
+		false,
+		pid,
+	)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(handle)
+
+	buf := make([]uint16, windows.MAX_PATH)
+	ret, _, err := procGetModuleBaseNameW.Call(
+		uintptr(handle),
+		0,
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(len(buf)),
+	)
+	if ret == 0 {
+		return "", err
+	}
+
+	return syscall.UTF16ToString(buf), nil
 }
 
 // getSliderName returns the name mapped to a slider number

@@ -9,4 +9,5 @@ require (
 	github.com/micmonay/keybd_event v1.1.1
 	github.com/moutend/go-wca v0.2.0
 	github.com/spf13/viper v1.7.1
+	golang.org/x/sys v0.0.0-20220624220833-87e55d714810
 )
