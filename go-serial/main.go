@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/itchyny/volume-go"
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/micmonay/keybd_event"
 	"github.com/spf13/viper"
@@ -35,6 +36,7 @@ const (
 
 var kb keybd_event.KeyBonding
 var userConfig *viper.Viper
+var sliderMapping map[string]int // maps slider names (like "master") to slider numbers
 
 func main() {
 	// Initialize configuration
@@ -43,6 +45,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
+
+	// Build slider mapping (reverse lookup: name -> number)
+	sliderMapping = buildSliderMapping()
 
 	// Initialize keyboard
 	kb, err = keybd_event.NewKeyBonding()
@@ -108,6 +113,25 @@ func initializeConfig() (*viper.Viper, error) {
 	return config, nil
 }
 
+// buildSliderMapping creates a reverse lookup map from slider names to numbers
+func buildSliderMapping() map[string]int {
+	mapping := make(map[string]int)
+	sliderMap := userConfig.GetStringMap(configKeySliderMapping)
+
+	for key, value := range sliderMap {
+		sliderNum, err := strconv.Atoi(key)
+		if err != nil {
+			continue
+		}
+		if sliderName, ok := value.(string); ok {
+			mapping[sliderName] = sliderNum
+			fmt.Printf("Slider %d -> %s\n", sliderNum, sliderName)
+		}
+	}
+
+	return mapping
+}
+
 // Continuously read from Arduino
 func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 	reader := bufio.NewReader(port)
@@ -164,6 +188,11 @@ func parseArduinoData(data string) ArduinoMessage {
 			n, err := fmt.Sscanf(part, "s%dv%d", &sliderNum, &value)
 			if err == nil && n == 2 {
 				msg.SliderValues[sliderNum] = value
+
+				// Check if this is the master volume slider
+				if sliderName := getSliderName(sliderNum); sliderName == "master" {
+					go setSystemVolume(value)
+				}
 			}
 		case 'b':
 			// Button: b1v1
@@ -186,6 +215,27 @@ func parseArduinoData(data string) ArduinoMessage {
 	}
 
 	return msg
+}
+
+// getSliderName returns the name mapped to a slider number
+func getSliderName(sliderNum int) string {
+	sliderMap := userConfig.GetStringMap(configKeySliderMapping)
+	if nameVal, exists := sliderMap[strconv.Itoa(sliderNum)]; exists {
+		if name, ok := nameVal.(string); ok {
+			return name
+		}
+	}
+	return ""
+}
+
+// setSystemVolume sets the Windows system volume (0-100)
+func setSystemVolume(percentage int) {
+	err := volume.SetVolume(percentage)
+	if err != nil {
+		log.Printf("Error setting volume to %d%%: %v", percentage, err)
+	} else {
+		fmt.Printf("[Volume] Set to %d%%\n", percentage)
+	}
 }
 
 // Send key press to Windows
