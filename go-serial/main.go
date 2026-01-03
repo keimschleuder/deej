@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-ole/go-ole"
 	"github.com/itchyny/volume-go"
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/micmonay/keybd_event"
+	"github.com/moutend/go-wca/pkg/wca"
 	"github.com/spf13/viper"
 )
 
@@ -44,6 +46,11 @@ func main() {
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose output (shows all messages)")
 	flag.Parse()
 	verbose = *verboseFlag
+
+	// Initialize COM for Windows Audio
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
 	// Initialize configuration
 	var err error
 	userConfig, err = initializeConfig()
@@ -202,9 +209,13 @@ func parseArduinoData(data string) ArduinoMessage {
 			if err == nil && n == 2 {
 				msg.SliderValues[sliderNum] = value
 
-				// Check if this is the master volume slider
-				if sliderName := getSliderName(sliderNum); sliderName == "master" {
+				// Check slider name and route to appropriate volume control
+				sliderName := getSliderName(sliderNum)
+				switch sliderName {
+				case "master":
 					go setSystemVolume(value)
+				case "mic":
+					go setMicrophoneVolume(value)
 				}
 			}
 		case 'b':
@@ -248,6 +259,45 @@ func setSystemVolume(percentage int) {
 		log.Printf("Error setting volume to %d%%: %v", percentage, err)
 	} else if verbose {
 		fmt.Printf("[Volume] Set to %d%%\n", percentage)
+	}
+}
+
+// setMicrophoneVolume sets the Windows microphone input volume (0-100)
+func setMicrophoneVolume(percentage int) {
+	var err error
+	var mmde *wca.IMMDeviceEnumerator
+
+	// Create device enumerator
+	if err = wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return
+	}
+	defer mmde.Release()
+
+	// Get default audio capture device (microphone)
+	var mmDevice *wca.IMMDevice
+	if err = mmde.GetDefaultAudioEndpoint(wca.ECapture, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default microphone: %v", err)
+		return
+	}
+	defer mmDevice.Release()
+
+	// Activate endpoint volume interface
+	var endpointVolume *wca.IAudioEndpointVolume
+	if err = mmDevice.Activate(wca.IID_IAudioEndpointVolume, wca.CLSCTX_ALL, nil, &endpointVolume); err != nil {
+		log.Printf("Error activating endpoint volume: %v", err)
+		return
+	}
+	defer endpointVolume.Release()
+
+	// Convert percentage (0-100) to scalar (0.0-1.0)
+	volumeScalar := float32(percentage) / 100.0
+
+	// Set the microphone volume
+	if err = endpointVolume.SetMasterVolumeLevelScalar(volumeScalar, nil); err != nil {
+		log.Printf("Error setting microphone volume to %d%%: %v", percentage, err)
+	} else if verbose {
+		fmt.Printf("[Microphone] Set to %d%%\n", percentage)
 	}
 }
 
