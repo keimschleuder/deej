@@ -267,6 +267,8 @@ func parseArduinoData(data string) ArduinoMessage {
 							continue
 						}
 						go setApplicationVolume(processName, value)
+					case "deej.unmapped":
+						setUnmappedApplicationsVolume(value)
 					default:
 						if strings.HasSuffix(strings.ToLower(target), ".exe") {
 							go setApplicationVolume(target, value)
@@ -328,6 +330,129 @@ func CurrentProcessName() (string, error) {
 	}
 
 	return syscall.UTF16ToString(buf), nil
+}
+
+// setUnmappedApplicationsVolume sets volume for all sessions not mapped to any slider,
+// excluding the current foreground app
+func setUnmappedApplicationsVolume(volume int) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
+	var mmde *wca.IMMDeviceEnumerator
+	if err := wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return
+	}
+	if mmde != nil {
+		defer mmde.Release()
+	}
+
+	var mmDevice *wca.IMMDevice
+	if err := mmde.GetDefaultAudioEndpoint(wca.ERender, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default audio endpoint: %v", err)
+		return
+	}
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
+
+	var sessionManager *wca.IAudioSessionManager2
+	if err := mmDevice.Activate(wca.IID_IAudioSessionManager2, wca.CLSCTX_ALL, nil, &sessionManager); err != nil {
+		log.Printf("Error activating session manager: %v", err)
+		return
+	}
+	if sessionManager != nil {
+		defer sessionManager.Release()
+	}
+
+	var sessionEnumerator *wca.IAudioSessionEnumerator
+	if err := sessionManager.GetSessionEnumerator(&sessionEnumerator); err != nil {
+		log.Printf("Error getting session enumerator: %v", err)
+		return
+	}
+	if sessionEnumerator != nil {
+		defer sessionEnumerator.Release()
+	}
+
+	var sessionCount int
+	if err := sessionEnumerator.GetCount(&sessionCount); err != nil {
+		log.Printf("Error getting session count: %v", err)
+		return
+	}
+
+	// Current foreground process to exclude
+	currentApp, err := CurrentProcessName()
+	if err != nil {
+		currentApp = ""
+	}
+	currentApp = strings.ToLower(currentApp)
+
+	// Collect all explicitly mapped apps
+	mappedApps := make(map[string]struct{})
+	for _, targets := range sliderTargetsMapping {
+		for _, t := range targets {
+			t = strings.ToLower(t)
+			if t != "deej.unmapped" && t != "master" && t != "mic" && t != "deej.current" {
+				mappedApps[t] = struct{}{}
+			}
+		}
+	}
+
+	for i := 0; i < sessionCount; i++ {
+		var sessionControl *wca.IAudioSessionControl
+		if err := sessionEnumerator.GetSession(i, &sessionControl); err != nil {
+			continue
+		}
+		if sessionControl == nil {
+			continue
+		}
+
+		sessionControl2Dispatch, err := sessionControl.QueryInterface(wca.IID_IAudioSessionControl2)
+		if err != nil {
+			sessionControl.Release()
+			continue
+		}
+		sessionControl2 := (*wca.IAudioSessionControl2)(unsafe.Pointer(sessionControl2Dispatch))
+
+		var processId uint32
+		if err := sessionControl2.GetProcessId(&processId); err != nil {
+			sessionControl2Dispatch.Release()
+			sessionControl.Release()
+			continue
+		}
+
+		processName := strings.ToLower(getProcessName(processId))
+
+		// Skip mapped apps and the current foreground app
+		if _, exists := mappedApps[processName]; exists || processName == currentApp {
+			sessionControl2Dispatch.Release()
+			sessionControl.Release()
+			continue
+		}
+
+		// Apply volume
+		simpleVolumeDispatch, err := sessionControl2.QueryInterface(wca.IID_ISimpleAudioVolume)
+		if err != nil {
+			sessionControl2Dispatch.Release()
+			sessionControl.Release()
+			continue
+		}
+		simpleVolume := (*wca.ISimpleAudioVolume)(unsafe.Pointer(simpleVolumeDispatch))
+
+		volumeScalar := float32(volume) / 100.0
+		simpleVolume.SetMasterVolume(volumeScalar, nil)
+
+		if verbose {
+			fmt.Printf("[Unmapped App: %s] Set to %d%%\n", processName, volume)
+		}
+
+		simpleVolumeDispatch.Release()
+		sessionControl2Dispatch.Release()
+		sessionControl.Release()
+	}
 }
 
 // setSystemVolume sets the Windows system volume (0-100)
