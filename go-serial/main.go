@@ -175,9 +175,6 @@ func handleUserInput(port io.ReadWriteCloser) {
 				fmt.Println("Usage: set <percentage> or set <slider> <percentage>")
 			}
 
-		case "get":
-			sendCommand(port, "GET")
-
 		case "ping":
 			sendCommand(port, "PING")
 
@@ -211,7 +208,6 @@ func sendCommand(port io.ReadWriteCloser, command string) {
 func printHelp() {
 	fmt.Println("\n=== Available Commands ===")
 	fmt.Println("  set <slider> <percentage>  - Set specific slider to percentage")
-	fmt.Println("  get                        - Request current slider/button status")
 	fmt.Println("  ping                       - Ping Arduino")
 	fmt.Println("  help                       - Show this help")
 	fmt.Println("  quit/exit/q                - Exit program")

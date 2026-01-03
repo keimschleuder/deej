@@ -45,7 +45,7 @@ bool lastButtonValues[NUM_BUTTONS];
 // Serial communication
 String serialBuffer = "";
 unsigned long lastSerialSend = 0;
-const unsigned long SERIAL_SEND_INTERVAL = 100; // Minimum ms between sends
+const unsigned long SERIAL_SEND_INTERVAL = 25; // Minimum ms between sends
 
 void setup() {
   delay(1000);
@@ -152,14 +152,9 @@ void processSerialCommand(String command) {
     } else {
       Serial.println("ERROR:INVALID_PARAMS");
     }
-  }
-  else if (cmd == "GET") {
-    sendValues();
-  }
-  else if (cmd == "PING") {
+  } else if (cmd == "PING") {
     Serial.println("PONG");
-  }
-  else {
+  } else {
     Serial.print("ERROR:UNKNOWN_CMD:");
     Serial.println(cmd);
   }
