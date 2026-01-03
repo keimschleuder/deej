@@ -12,6 +12,7 @@ import (
 
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/micmonay/keybd_event"
+	"github.com/spf13/viper"
 )
 
 type ArduinoMessage struct {
@@ -20,32 +21,56 @@ type ArduinoMessage struct {
 	ButtonStates map[int]bool
 }
 
-type Config struct {
-	SliderMapping map[int]string `yaml:"slider_mapping"`
-	ButtonMapping map[int]int    `yaml:"button_mapping"`
-	ComPort       string         `yaml:"com_port"`
-	BaudRate      uint           `yaml:"baud_rate"`
-}
+const (
+	configName             = "config"
+	configType             = "yaml"
+	configPath             = "."
+	configKeySliderMapping = "slider_mapping"
+	configKeyButtonMapping = "button_mapping"
+	configKeyCOMPort       = "com_port"
+	configKeyBaudRate      = "baud_rate"
+	defaultCOMPort         = "COM9"
+	defaultBaudRate        = 9600
+)
 
 var kb keybd_event.KeyBonding
-var config Config
+var userConfig *viper.Viper
 
 func main() {
+	// Initialize configuration
+	var err error
+	userConfig, err = initializeConfig()
+	if err != nil {
+		log.Fatalf("Failed to initialize config: %v", err)
+	}
+
+	// Initialize keyboard
+	kb, err = keybd_event.NewKeyBonding()
+	if err != nil {
+		log.Fatalf("Failed to initialize keyboard: %v", err)
+	}
+
+	// Get config values
+	comPort := userConfig.GetString(configKeyCOMPort)
+	baudRate := userConfig.GetUint(configKeyBaudRate)
+
+	// Configure serial port
 	options := serial.OpenOptions{
-		PortName:        "COM9",
-		BaudRate:        9600,
+		PortName:        comPort,
+		BaudRate:        baudRate,
 		DataBits:        8,
 		StopBits:        1,
 		MinimumReadSize: 1,
 	}
 
+	// Open serial port
 	port, err := serial.Open(options)
 	if err != nil {
 		log.Fatalf("Failed to open port: %v", err)
 	}
 	defer port.Close()
 
-	fmt.Println("Connected to Arduino on COM9")
+	fmt.Printf("Connected to Arduino on %s at %d baud\n", comPort, baudRate)
 	time.Sleep(2 * time.Second)
 
 	// Channel for Arduino messages
@@ -59,6 +84,28 @@ func main() {
 
 	// Main loop: handle user input
 	handleUserInput(port)
+}
+
+// initializeConfig creates and configures a viper instance for the config file
+func initializeConfig() (*viper.Viper, error) {
+	config := viper.New()
+	config.SetConfigName(configName)
+	config.SetConfigType(configType)
+	config.AddConfigPath(configPath)
+
+	// Set defaults
+	config.SetDefault(configKeySliderMapping, map[int]string{})
+	config.SetDefault(configKeyButtonMapping, map[int]int{})
+	config.SetDefault(configKeyCOMPort, defaultCOMPort)
+	config.SetDefault(configKeyBaudRate, defaultBaudRate)
+
+	// Read config file
+	if err := config.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	fmt.Printf("Loaded config from: %s\n", config.ConfigFileUsed())
+	return config, nil
 }
 
 // Continuously read from Arduino
@@ -124,11 +171,34 @@ func parseArduinoData(data string) ArduinoMessage {
 			n, err := fmt.Sscanf(part, "b%dv%d", &buttonNum, &value)
 			if err == nil && n == 2 {
 				msg.ButtonStates[buttonNum] = (value == 1)
+
+				// Send button press to Windows if button is pressed
+				if value == 1 {
+					buttonMapping := userConfig.GetStringMap(configKeyButtonMapping)
+					if keyCodeVal, exists := buttonMapping[strconv.Itoa(buttonNum)]; exists {
+						if keyCode, ok := keyCodeVal.(int); ok {
+							go sendKeyPress(keyCode)
+						}
+					}
+				}
 			}
 		}
 	}
 
 	return msg
+}
+
+// Send key press to Windows
+func sendKeyPress(keyCode int) {
+	kb.SetKeys(keyCode)
+	err := kb.Launching()
+	if err != nil {
+		log.Printf("Error sending key press %d: %v", keyCode, err)
+	} else {
+		fmt.Printf("[Key Press] Sent key code: %d\n", keyCode)
+	}
+	time.Sleep(50 * time.Millisecond)
+	kb.Clear()
 }
 
 // Process incoming messages from Arduino
@@ -145,8 +215,6 @@ func processMessages(msgChan <-chan ArduinoMessage) {
 				fmt.Printf("  → Button %d: PRESSED\n", button)
 			}
 		}
-
-		fmt.Print("\nEnter command: ")
 	}
 }
 
@@ -155,7 +223,6 @@ func handleUserInput(port io.ReadWriteCloser) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Print("\nEnter command: ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			log.Printf("Error reading input: %v", err)
