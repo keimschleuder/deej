@@ -90,9 +90,7 @@ func main() {
 	go readFromArduino(port, msgChan)
 
 	// Start processing received messages
-	if verbose {
-		go processMessages(msgChan)
-	}
+	go processMessages(msgChan)
 
 	// Main loop: handle user input
 	handleUserInput(port)
@@ -269,15 +267,17 @@ func sendKeyPress(keyCode int) {
 // Process incoming messages from Arduino
 func processMessages(msgChan <-chan ArduinoMessage) {
 	for msg := range msgChan {
-		fmt.Printf("\n[%s] Arduino Update:\n", msg.Timestamp.Format("15:04:05"))
+		if verbose {
+			fmt.Printf("\n[%s] Arduino Update:\n", msg.Timestamp.Format("15:04:05"))
 
-		for slider, value := range msg.SliderValues {
-			fmt.Printf("  → Slider %d: %d%%\n", slider, value)
-		}
+			for slider, value := range msg.SliderValues {
+				fmt.Printf("  → Slider %d: %d%%\n", slider, value)
+			}
 
-		for button, state := range msg.ButtonStates {
-			if state {
-				fmt.Printf("  → Button %d: PRESSED\n", button)
+			for button, state := range msg.ButtonStates {
+				if state {
+					fmt.Printf("  → Button %d: PRESSED\n", button)
+				}
 			}
 		}
 	}
