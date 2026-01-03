@@ -142,6 +142,8 @@ func buildSliderMapping() map[string]int {
 			if verbose {
 				fmt.Printf("Slider %d -> %s\n", sliderNum, sliderName)
 			}
+		} else {
+			fmt.Println("Something went wrong during slider mapping")
 		}
 	}
 
@@ -263,6 +265,10 @@ func setSystemVolume(percentage int) {
 
 // setMicrophoneVolume sets the Windows microphone input volume (0-100)
 func setMicrophoneVolume(percentage int) {
+	// Initialize COM for this goroutine
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
 	var err error
 	var mmde *wca.IMMDeviceEnumerator
 
