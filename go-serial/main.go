@@ -80,10 +80,8 @@ func main() {
 	}
 	defer port.Close()
 
-	if verbose {
-		fmt.Printf("Connected to Arduino on %s at %d baud\n", comPort, baudRate)
-	}
 	time.Sleep(2 * time.Second)
+	fmt.Printf("Connected to Arduino on %s at %d baud\n", comPort, baudRate)
 
 	// Channel for Arduino messages
 	msgChan := make(chan ArduinoMessage, 10)
