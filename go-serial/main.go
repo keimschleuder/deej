@@ -7,8 +7,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -267,42 +269,44 @@ func setSystemVolume(percentage int) {
 	}
 }
 
-// setMicrophoneVolume sets the Windows microphone input volume (0-100)
 func setMicrophoneVolume(percentage int) {
-	// Initialize COM for this goroutine
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 	defer ole.CoUninitialize()
 
 	var err error
 	var mmde *wca.IMMDeviceEnumerator
 
-	// Create device enumerator
 	if err = wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
 		log.Printf("Error creating device enumerator: %v", err)
 		return
 	}
-	defer mmde.Release()
+	if mmde != nil {
+		defer mmde.Release()
+	}
 
-	// Get default audio capture device (microphone)
 	var mmDevice *wca.IMMDevice
 	if err = mmde.GetDefaultAudioEndpoint(wca.ECapture, wca.EConsole, &mmDevice); err != nil {
 		log.Printf("Error getting default microphone: %v", err)
 		return
 	}
-	defer mmDevice.Release()
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
 
-	// Activate endpoint volume interface
 	var endpointVolume *wca.IAudioEndpointVolume
 	if err = mmDevice.Activate(wca.IID_IAudioEndpointVolume, wca.CLSCTX_ALL, nil, &endpointVolume); err != nil {
 		log.Printf("Error activating endpoint volume: %v", err)
 		return
 	}
-	defer endpointVolume.Release()
+	if endpointVolume != nil {
+		defer endpointVolume.Release()
+	}
 
-	// Convert percentage (0-100) to scalar (0.0-1.0)
 	volumeScalar := float32(percentage) / 100.0
 
-	// Set the microphone volume
 	if err = endpointVolume.SetMasterVolumeLevelScalar(volumeScalar, nil); err != nil {
 		log.Printf("Error setting microphone volume to %d%%: %v", percentage, err)
 	} else if verbose {
@@ -310,54 +314,57 @@ func setMicrophoneVolume(percentage int) {
 	}
 }
 
-// setApplicationVolume sets the volume for a specific application (0-100)
 func setApplicationVolume(processName string, percentage int) {
-	// Initialize COM for this goroutine
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 	defer ole.CoUninitialize()
 
 	var err error
 	var mmde *wca.IMMDeviceEnumerator
 
-	// Create device enumerator
 	if err = wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
 		log.Printf("Error creating device enumerator: %v", err)
 		return
 	}
-	defer mmde.Release()
+	if mmde != nil {
+		defer mmde.Release()
+	}
 
-	// Get default audio output device
 	var mmDevice *wca.IMMDevice
 	if err = mmde.GetDefaultAudioEndpoint(wca.ERender, wca.EConsole, &mmDevice); err != nil {
 		log.Printf("Error getting default audio endpoint: %v", err)
 		return
 	}
-	defer mmDevice.Release()
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
 
-	// Activate session manager
 	var sessionManager *wca.IAudioSessionManager2
 	if err = mmDevice.Activate(wca.IID_IAudioSessionManager2, wca.CLSCTX_ALL, nil, &sessionManager); err != nil {
 		log.Printf("Error activating session manager: %v", err)
 		return
 	}
-	defer sessionManager.Release()
+	if sessionManager != nil {
+		defer sessionManager.Release()
+	}
 
-	// Get session enumerator
 	var sessionEnumerator *wca.IAudioSessionEnumerator
 	if err = sessionManager.GetSessionEnumerator(&sessionEnumerator); err != nil {
 		log.Printf("Error getting session enumerator: %v", err)
 		return
 	}
-	defer sessionEnumerator.Release()
+	if sessionEnumerator != nil {
+		defer sessionEnumerator.Release()
+	}
 
-	// Get session count
 	var sessionCount int
 	if err = sessionEnumerator.GetCount(&sessionCount); err != nil {
 		log.Printf("Error getting session count: %v", err)
 		return
 	}
 
-	// Iterate through all audio sessions
 	processNameLower := strings.ToLower(processName)
 	found := false
 
@@ -366,39 +373,37 @@ func setApplicationVolume(processName string, percentage int) {
 		if err = sessionEnumerator.GetSession(i, &sessionControl); err != nil {
 			continue
 		}
-
-		// Get session control 2 interface
-		var sessionControl2 *wca.IAudioSessionControl2
-		if err = sessionControl.QueryInterface(wca.IID_IAudioSessionControl2, &sessionControl2); err != nil {
-			sessionControl.Release()
+		if sessionControl == nil {
 			continue
 		}
 
-		// Get process ID
+		sessionControl2Dispatch, err := sessionControl.QueryInterface(wca.IID_IAudioSessionControl2)
+		if err != nil {
+			sessionControl.Release()
+			continue
+		}
+		sessionControl2 := (*wca.IAudioSessionControl2)(unsafe.Pointer(sessionControl2Dispatch))
+
 		var processId uint32
 		if err = sessionControl2.GetProcessId(&processId); err != nil {
-			sessionControl2.Release()
+			sessionControl2Dispatch.Release()
 			sessionControl.Release()
 			continue
 		}
 
-		// Get process name
 		currentProcessName := getProcessName(processId)
 
-		// Check if this is the target process
 		if strings.ToLower(currentProcessName) == processNameLower {
-			// Get simple audio volume interface
-			var simpleVolume *wca.ISimpleAudioVolume
-			if err = sessionControl2.QueryInterface(wca.IID_ISimpleAudioVolume, &simpleVolume); err != nil {
-				sessionControl2.Release()
+			simpleVolumeDispatch, err := sessionControl2.QueryInterface(wca.IID_ISimpleAudioVolume)
+			if err != nil {
+				sessionControl2Dispatch.Release()
 				sessionControl.Release()
 				continue
 			}
+			simpleVolume := (*wca.ISimpleAudioVolume)(unsafe.Pointer(simpleVolumeDispatch))
 
-			// Convert percentage to scalar (0.0-1.0)
 			volumeScalar := float32(percentage) / 100.0
 
-			// Set the volume
 			if err = simpleVolume.SetMasterVolume(volumeScalar, nil); err != nil {
 				log.Printf("Error setting volume for %s: %v", processName, err)
 			} else {
@@ -408,13 +413,15 @@ func setApplicationVolume(processName string, percentage int) {
 				found = true
 			}
 
-			simpleVolume.Release()
-			sessionControl2.Release()
+			// release dispatch objects explicitly (in reverse order)
+			simpleVolumeDispatch.Release()
+			sessionControl2Dispatch.Release()
 			sessionControl.Release()
 			break
 		}
 
-		sessionControl2.Release()
+		// not target -> release and continue
+		sessionControl2Dispatch.Release()
 		sessionControl.Release()
 	}
 
@@ -439,10 +446,10 @@ func getProcessNameWindows(pid uint32) string {
 	// This requires additional Windows API calls
 	// For simplicity, we'll use a basic approach
 
-	var kernel32 = ole.NewLazyDLL("kernel32.dll")
-	var openProcess = kernel32.NewProc("OpenProcess")
-	var queryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
-	var closeHandle = kernel32.NewProc("CloseHandle")
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	openProcess := kernel32.NewProc("OpenProcess")
+	queryFullProcessImageName := kernel32.NewProc("QueryFullProcessImageNameW")
+	closeHandle := kernel32.NewProc("CloseHandle")
 
 	// Open process with QUERY_LIMITED_INFORMATION access
 	handle, _, _ := openProcess.Call(
@@ -472,7 +479,7 @@ func getProcessNameWindows(pid uint32) string {
 	}
 
 	// Convert to string and extract just the filename
-	fullPath := ole.UTF16PtrToString(&buffer[0])
+	fullPath := syscall.UTF16ToString(buffer[:size])
 	parts := strings.Split(fullPath, "\\")
 	if len(parts) > 0 {
 		return parts[len(parts)-1]
