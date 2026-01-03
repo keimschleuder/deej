@@ -269,6 +269,8 @@ func parseArduinoData(data string) ArduinoMessage {
 						go setApplicationVolume(processName, value)
 					case "deej.unmapped":
 						setUnmappedApplicationsVolume(value)
+					case "system":
+						setSystemSoundsVolume(value)
 					default:
 						if strings.HasSuffix(strings.ToLower(target), ".exe") {
 							go setApplicationVolume(target, value)
@@ -450,6 +452,98 @@ func setUnmappedApplicationsVolume(volume int) {
 		}
 
 		simpleVolumeDispatch.Release()
+		sessionControl2Dispatch.Release()
+		sessionControl.Release()
+	}
+}
+
+// setSystemSoundsVolume sets volume for Windows system sounds
+func setSystemSoundsVolume(volume int) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
+	var mmde *wca.IMMDeviceEnumerator
+	if err := wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return
+	}
+	if mmde != nil {
+		defer mmde.Release()
+	}
+
+	var mmDevice *wca.IMMDevice
+	if err := mmde.GetDefaultAudioEndpoint(wca.ERender, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default audio endpoint: %v", err)
+		return
+	}
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
+
+	var sessionManager *wca.IAudioSessionManager2
+	if err := mmDevice.Activate(wca.IID_IAudioSessionManager2, wca.CLSCTX_ALL, nil, &sessionManager); err != nil {
+		log.Printf("Error activating session manager: %v", err)
+		return
+	}
+	if sessionManager != nil {
+		defer sessionManager.Release()
+	}
+
+	var sessionEnumerator *wca.IAudioSessionEnumerator
+	if err := sessionManager.GetSessionEnumerator(&sessionEnumerator); err != nil {
+		log.Printf("Error getting session enumerator: %v", err)
+		return
+	}
+	if sessionEnumerator != nil {
+		defer sessionEnumerator.Release()
+	}
+
+	var sessionCount int
+	if err := sessionEnumerator.GetCount(&sessionCount); err != nil {
+		log.Printf("Error getting session count: %v", err)
+		return
+	}
+
+	for i := 0; i < sessionCount; i++ {
+		var sessionControl *wca.IAudioSessionControl
+		if err := sessionEnumerator.GetSession(i, &sessionControl); err != nil {
+			continue
+		}
+		if sessionControl == nil {
+			continue
+		}
+
+		sessionControl2Dispatch, err := sessionControl.QueryInterface(wca.IID_IAudioSessionControl2)
+		if err != nil {
+			sessionControl.Release()
+			continue
+		}
+		sessionControl2 := (*wca.IAudioSessionControl2)(unsafe.Pointer(sessionControl2Dispatch))
+
+		displayName := ""
+		sessionControl2.GetDisplayName(&displayName)
+		if strings.ToLower(displayName) == "system sounds" {
+			simpleVolumeDispatch, err := sessionControl2.QueryInterface(wca.IID_ISimpleAudioVolume)
+			if err != nil {
+				sessionControl2Dispatch.Release()
+				sessionControl.Release()
+				continue
+			}
+			simpleVolume := (*wca.ISimpleAudioVolume)(unsafe.Pointer(simpleVolumeDispatch))
+
+			volumeScalar := float32(volume) / 100.0
+			simpleVolume.SetMasterVolume(volumeScalar, nil)
+
+			if verbose {
+				fmt.Printf("[System Sounds] Set to %d%%\n", volume)
+			}
+
+			simpleVolumeDispatch.Release()
+		}
+
 		sessionControl2Dispatch.Release()
 		sessionControl.Release()
 	}
