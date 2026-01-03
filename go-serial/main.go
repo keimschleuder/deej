@@ -269,8 +269,6 @@ func parseArduinoData(data string) ArduinoMessage {
 						go setApplicationVolume(processName, value)
 					case "deej.unmapped":
 						setUnmappedApplicationsVolume(value)
-					case "system":
-						setSystemSoundsVolume(value)
 					default:
 						if strings.HasSuffix(strings.ToLower(target), ".exe") {
 							go setApplicationVolume(target, value)
