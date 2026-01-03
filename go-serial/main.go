@@ -96,7 +96,7 @@ func main() {
 	// Start reading from Arduino in background
 	go readFromArduino(port, msgChan)
 
-	// Start processing received messages
+	// Start processing received messages (always run to drain channel)
 	go processMessages(msgChan)
 
 	// Main loop: handle user input
@@ -167,7 +167,6 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 
 		// Parse the message
 		if strings.HasPrefix(line, "OK:") || strings.HasPrefix(line, "ERROR:") {
-			// Command response
 			if verbose {
 				fmt.Printf("[Arduino Response] %s\n", line)
 			}
@@ -407,5 +406,9 @@ func printHelp() {
 	fmt.Println("  ping                       - Ping Arduino")
 	fmt.Println("  help                       - Show this help")
 	fmt.Println("  quit/exit/q                - Exit program")
+	fmt.Println("\nSlider Mapping:")
+	for name, num := range sliderMapping {
+		fmt.Printf("  Slider %d -> %s\n", num, name)
+	}
 	fmt.Println("========================")
 }
