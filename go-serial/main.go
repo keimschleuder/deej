@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jacobsa/go-serial/serial"
+	"github.com/micmonay/keybd_event"
 )
 
 type ArduinoMessage struct {
@@ -18,6 +19,16 @@ type ArduinoMessage struct {
 	SliderValues map[int]int
 	ButtonStates map[int]bool
 }
+
+type Config struct {
+	SliderMapping map[int]string `yaml:"slider_mapping"`
+	ButtonMapping map[int]int    `yaml:"button_mapping"`
+	ComPort       string         `yaml:"com_port"`
+	BaudRate      uint           `yaml:"baud_rate"`
+}
+
+var kb keybd_event.KeyBonding
+var config Config
 
 func main() {
 	options := serial.OpenOptions{
