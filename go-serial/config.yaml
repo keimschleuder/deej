@@ -27,7 +27,7 @@ slider_mapping:
 # 
 # MAKE SURE THE NUMBER OF BUTTONS IN THE CONFIG MATCHES THE NUMBER OF BUTTONS REPORTED BY THE ARDUINO
 # If the number of buttons is not the same, deej might crash 
-#
+
 button_mapping:
   0: 4268 # VOLUME_MUTE
   1: 4219 # F13
