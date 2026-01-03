@@ -457,10 +457,6 @@ func setUnmappedApplicationsVolume(volume int) {
 	}
 }
 
-func setSystemSoundsVolume(volume int) {
-	// TODO
-}
-
 // setSystemVolume sets the Windows system volume (0-100)
 func setSystemVolume(percentage int) {
 	err := volume.SetVolume(percentage)

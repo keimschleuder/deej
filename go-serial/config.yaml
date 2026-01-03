@@ -4,10 +4,9 @@
 # you can use 'deej.unmapped' to control all apps that aren't bound to any slider (this ignores master, system, mic and device-targeting sessions)
 # windows only - you can use 'deej.current' to control the currently active app (whether full-screen or not)
 # windows only - you can use a device's full name, i.e. "Speakers (Realtek High Definition Audio)", to bind it. this works for both output and input devices
-# windows only - you can use 'system' to control the "system sounds" volume
 # important: slider indexes start at 0, regardless of which analog pins you're using!
 slider_mapping:
-  0: system
+  0: master
 #  0: master
 #  1: deej.current
 #  2: discord.exe
