@@ -1,0 +1,41 @@
+# process names are case-insensitive
+# you can use 'master' to indicate the master channel, or a list of process names to create a group
+# you can use 'mic' to control your mic input level (uses the default recording device)
+# you can use 'deej.unmapped' to control all apps that aren't bound to any slider (this ignores master, system, mic and device-targeting sessions)
+# windows only - you can use 'deej.current' to control the currently active app (whether full-screen or not)
+# windows only - you can use a device's full name, i.e. "Speakers (Realtek High Definition Audio)", to bind it. this works for both output and input devices
+# windows only - you can use 'system' to control the "system sounds" volume
+# important: slider indexes start at 0, regardless of which analog pins you're using!
+slider_mapping:
+  0: master
+#  1: deej.current
+#  2: discord.exe
+#  3: 
+#    - itunes.exe
+#    - spotify.exe
+#    - msedge.exe
+#  4: deej.unmapped
+#  5: mic
+
+# supported button list https://github.com/micmonay/keybd_event/blob/master/keybd_windows.go (scroll down)
+# be sure to convert hex values to decimal (hex values start with 0x)
+# for example: to get F13 (0x7C + 0xFFF)
+# 0x7C  = 124
+# 0xFFF = 4095
+# 124 + 4095
+# F13 = 4219
+# 
+# MAKE SURE THE NUMBER OF BUTTONS IN THE CONFIG MATCHES THE NUMBER OF BUTTONS REPORTED BY THE ARDUINO
+# If the number of buttons is not the same, deej might crash 
+#
+button_mapping:
+  0: 4268 # VOLUME_MUTE
+  1: 4219 # F13
+  2: 4271 # MEDIA_NEXT_TRACK
+  3: 4274 # MEDIA_PLAY_PAUSE
+  4: 4272 # MEDIA_NEXT_TRACK
+  5: 4220 # F14
+
+# settings for connecting to the arduino board
+com_port: COM9
+baud_rate: 9600
