@@ -262,9 +262,10 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, line string) {
 	splitLineButtons := []string{}
 
 	for _, splitValue := range splitLine {
-		if splitValue[0] == 's' {
+		switch splitValue[0] {
+		case 's':
 			splitLineSliders = append(splitLineSliders, strings.Replace(splitValue, "s", "", -1))
-		} else if splitValue[0] == 'b' {
+		case 'b':
 			splitLineButtons = append(splitLineButtons, strings.Replace(splitValue, "b", "", -1))
 		}
 	}
