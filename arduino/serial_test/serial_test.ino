@@ -53,6 +53,7 @@ void setup() {
   // Setup Screen
   Screen.begin();
   Screen.background(0, 0, 0);
+  //Textfarbe: Weiß
   Screen.stroke(blue, green, red);
 
   // Slider Setup
@@ -73,6 +74,9 @@ void setup() {
   // Serial setup
   Serial.begin(9600);
   
+  Serial.println("Waiting for serial");
+
+  // Wait for serial connection
   while (!Serial) {
     ; // Wait for serial port to connect
   }
@@ -314,6 +318,26 @@ void steer(uint8_t slider, bool dir) {
   
   switch (slider) {
     case 0:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 1:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 2:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 3:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 4:
+    outputs[0] = true;
+    outputs[1] = dir;
+    break;
+  case 5:
       outputs[0] = true;
       outputs[1] = dir;
       break;
@@ -338,14 +362,9 @@ void haltSliders() {
 
 void delegateDisplay(uint8_t percentage, uint8_t slider) {
   if (currentScreenState == PERCENTAGE) {
-    if (lastSliderActive == slider) {
-      updatePercentageSameSlider(percentage);
-    } else {
-      updatePercentage(percentage, slider);
-    }
-  } else {
-    displayPercentage(percentage, slider);
-  }
+    if (lastSliderActive == slider) { updatePercentageSameSlider(percentage); }
+    else { updatePercentage(percentage, slider); }
+  } else { displayPercentage(percentage, slider); }
 }
 
 void displayPercentage(uint8_t percentage, uint8_t slider) {
@@ -406,7 +425,7 @@ void drawIdle() {
   // Clear Screen
   Screen.fillScreen(Screen.Color565(0, 0, 0));
 
-  // Coverart placeholder
+  // TODO: Coverart
   Screen.fillRect(30, 0, 100, 100, Screen.Color565(0, 0, 255));
 
   // Media controls
