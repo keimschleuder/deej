@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -37,8 +38,12 @@ const (
 var kb keybd_event.KeyBonding
 var userConfig *viper.Viper
 var sliderMapping map[string]int // maps slider names (like "master") to slider numbers
+var verbose bool                 // verbose mode flag
 
 func main() {
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose output (shows all messages)")
+	flag.Parse()
+	verbose = *verboseFlag
 	// Initialize configuration
 	var err error
 	userConfig, err = initializeConfig()
@@ -75,7 +80,9 @@ func main() {
 	}
 	defer port.Close()
 
-	fmt.Printf("Connected to Arduino on %s at %d baud\n", comPort, baudRate)
+	if verbose {
+		fmt.Printf("Connected to Arduino on %s at %d baud\n", comPort, baudRate)
+	}
 	time.Sleep(2 * time.Second)
 
 	// Channel for Arduino messages
@@ -85,7 +92,9 @@ func main() {
 	go readFromArduino(port, msgChan)
 
 	// Start processing received messages
-	go processMessages(msgChan)
+	if verbose {
+		go processMessages(msgChan)
+	}
 
 	// Main loop: handle user input
 	handleUserInput(port)
@@ -109,7 +118,9 @@ func initializeConfig() (*viper.Viper, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	fmt.Printf("Loaded config from: %s\n", config.ConfigFileUsed())
+	if verbose {
+		fmt.Printf("Loaded config from: %s\n", config.ConfigFileUsed())
+	}
 	return config, nil
 }
 
@@ -125,7 +136,9 @@ func buildSliderMapping() map[string]int {
 		}
 		if sliderName, ok := value.(string); ok {
 			mapping[sliderName] = sliderNum
-			fmt.Printf("Slider %d -> %s\n", sliderNum, sliderName)
+			if verbose {
+				fmt.Printf("Slider %d -> %s\n", sliderNum, sliderName)
+			}
 		}
 	}
 
@@ -152,9 +165,13 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 		// Parse the message
 		if strings.HasPrefix(line, "OK:") || strings.HasPrefix(line, "ERROR:") {
 			// Command response
-			fmt.Printf("[Arduino Response] %s\n", line)
+			if verbose {
+				fmt.Printf("[Arduino Response] %s\n", line)
+			}
 		} else if line == "Arduino ready" {
-			fmt.Println("[Arduino] Ready!")
+			if verbose {
+				fmt.Println("[Arduino] Ready!")
+			}
 		} else if line == "PONG" {
 			fmt.Println("[Arduino] PONG received")
 		} else {
@@ -233,7 +250,7 @@ func setSystemVolume(percentage int) {
 	err := volume.SetVolume(percentage)
 	if err != nil {
 		log.Printf("Error setting volume to %d%%: %v", percentage, err)
-	} else {
+	} else if verbose {
 		fmt.Printf("[Volume] Set to %d%%\n", percentage)
 	}
 }
@@ -244,7 +261,7 @@ func sendKeyPress(keyCode int) {
 	err := kb.Launching()
 	if err != nil {
 		log.Printf("Error sending key press %d: %v", keyCode, err)
-	} else {
+	} else if verbose {
 		fmt.Printf("[Key Press] Sent key code: %d\n", keyCode)
 	}
 	time.Sleep(50 * time.Millisecond)
@@ -299,8 +316,9 @@ func handleUserInput(port io.ReadWriteCloser) {
 					continue
 				}
 				sendCommand(port, fmt.Sprintf("SET:%d:%d", slider, percentage))
+				parseArduinoData(fmt.Sprintf("s%dv%d", slider, percentage))
 			} else {
-				fmt.Println("Usage: set <percentage> or set <slider> <percentage>")
+				fmt.Println("Usage: set <slider> <percentage>")
 			}
 
 		case "ping":
@@ -329,7 +347,9 @@ func sendCommand(port io.ReadWriteCloser, command string) {
 		return
 	}
 
-	fmt.Printf("[Sent %d bytes] %s\n", n, strings.TrimSpace(command))
+	if verbose {
+		fmt.Printf("[Sent %d bytes] %s\n", n, strings.TrimSpace(command))
+	}
 }
 
 // Print available commands
