@@ -54,6 +54,9 @@ var (
 	sliderMapping        map[string]int   // name -> number (for verbose/help)
 	sliderTargetsMapping map[int][]string // slider number -> list of targets
 	verbose              bool
+
+	lastForegroundWindowName string
+	lastSliderValues         []int
 )
 
 func main() {
@@ -74,6 +77,8 @@ func main() {
 
 	// Build slider mapping (name -> number) and targets mapping
 	sliderMapping = buildSliderMapping()
+	numSliders := len(sliderMapping)
+	initialize(numSliders)
 
 	// Initialize keyboard
 	kb, err = keybd_event.NewKeyBonding()
@@ -113,8 +118,19 @@ func main() {
 	// Start processing received messages (always run to drain channel)
 	go processMessages(msgChan)
 
+	currentWindowSlider := getSliderNumberForTarget("deej.current")
+	// Check for changes in the current window
+	if currentWindowSlider >= 0 {
+		go TrackCurrentProcessChanges(port, currentWindowSlider)
+	}
+
 	// Main loop: handle user input
 	handleUserInput(port)
+}
+
+func initialize(numSliders int) {
+	// Allocate the slice inside the function
+	lastSliderValues = make([]int, numSliders)
 }
 
 // initializeConfig creates and configures a viper instance for the config file
@@ -192,6 +208,18 @@ func getSliderTargets(sliderNum int) []string {
 	return nil
 }
 
+func getSliderNumberForTarget(target string) int {
+	targetLower := strings.ToLower(target)
+	for sliderNum, targets := range sliderTargetsMapping {
+		for _, t := range targets {
+			if strings.ToLower(t) == targetLower {
+				return sliderNum
+			}
+		}
+	}
+	return -1
+}
+
 // Continuously read from Arduino
 func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 	reader := bufio.NewReader(port)
@@ -252,6 +280,8 @@ func parseArduinoData(data string) ArduinoMessage {
 			if err == nil && n == 2 {
 				msg.SliderValues[sliderNum] = value
 
+				lastSliderValues[sliderNum] = value
+
 				// Get all targets for this slider
 				targets := getSliderTargets(sliderNum)
 				for _, target := range targets {
@@ -267,6 +297,7 @@ func parseArduinoData(data string) ArduinoMessage {
 							continue
 						}
 						go setApplicationVolume(processName, value)
+						lastForegroundWindowName = processName
 					case "deej.unmapped":
 						setUnmappedApplicationsVolume(value)
 					default:
@@ -330,6 +361,27 @@ func CurrentProcessName() (string, error) {
 	}
 
 	return syscall.UTF16ToString(buf), nil
+}
+
+func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
+	for {
+		processName, err := CurrentProcessName()
+		if err != nil {
+			// log.Println(err)
+			continue
+		}
+		if processName != lastForegroundWindowName {
+			volume := getApplicationVolume(processName)
+			if volume >= 0 && volume != lastSliderValues[slider] {
+				sendCommand(port, fmt.Sprintf("SET:%d:%d", slider, volume))
+				lastSliderValues[slider] = volume
+				if verbose {
+					fmt.Printf("Current Window changed, adjusted slider to %v", volume)
+				}
+			}
+			lastForegroundWindowName = processName
+		}
+	}
 }
 
 // setUnmappedApplicationsVolume sets volume for all sessions not mapped to any slider,
@@ -622,6 +674,123 @@ func setApplicationVolume(processName string, percentage int) {
 	if !found && verbose {
 		log.Printf("Application %s not found or not playing audio", processName)
 	}
+}
+
+// Returns -1 if the application is not found or not playing audio
+func getApplicationVolume(processName string) int {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
+	var err error
+	var mmde *wca.IMMDeviceEnumerator
+
+	if err = wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return -1
+	}
+	if mmde != nil {
+		defer mmde.Release()
+	}
+
+	var mmDevice *wca.IMMDevice
+	if err = mmde.GetDefaultAudioEndpoint(wca.ERender, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default audio endpoint: %v", err)
+		return -1
+	}
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
+
+	var sessionManager *wca.IAudioSessionManager2
+	if err = mmDevice.Activate(wca.IID_IAudioSessionManager2, wca.CLSCTX_ALL, nil, &sessionManager); err != nil {
+		log.Printf("Error activating session manager: %v", err)
+		return -1
+	}
+	if sessionManager != nil {
+		defer sessionManager.Release()
+	}
+
+	var sessionEnumerator *wca.IAudioSessionEnumerator
+	if err = sessionManager.GetSessionEnumerator(&sessionEnumerator); err != nil {
+		log.Printf("Error getting session enumerator: %v", err)
+		return -1
+	}
+	if sessionEnumerator != nil {
+		defer sessionEnumerator.Release()
+	}
+
+	var sessionCount int
+	if err = sessionEnumerator.GetCount(&sessionCount); err != nil {
+		log.Printf("Error getting session count: %v", err)
+		return -1
+	}
+
+	processNameLower := strings.ToLower(processName)
+
+	for i := 0; i < sessionCount; i++ {
+		var sessionControl *wca.IAudioSessionControl
+		if err = sessionEnumerator.GetSession(i, &sessionControl); err != nil {
+			continue
+		}
+		if sessionControl == nil {
+			continue
+		}
+
+		sessionControl2Dispatch, err := sessionControl.QueryInterface(wca.IID_IAudioSessionControl2)
+		if err != nil {
+			sessionControl.Release()
+			continue
+		}
+		sessionControl2 := (*wca.IAudioSessionControl2)(unsafe.Pointer(sessionControl2Dispatch))
+
+		var processId uint32
+		if err = sessionControl2.GetProcessId(&processId); err != nil {
+			sessionControl2Dispatch.Release()
+			sessionControl.Release()
+			continue
+		}
+
+		currentProcessName := getProcessName(processId)
+
+		if strings.ToLower(currentProcessName) == processNameLower {
+			simpleVolumeDispatch, err := sessionControl2.QueryInterface(wca.IID_ISimpleAudioVolume)
+			if err != nil {
+				sessionControl2Dispatch.Release()
+				sessionControl.Release()
+				continue
+			}
+			simpleVolume := (*wca.ISimpleAudioVolume)(unsafe.Pointer(simpleVolumeDispatch))
+
+			var volumeScalar float32
+			if err = simpleVolume.GetMasterVolume(&volumeScalar); err != nil {
+				log.Printf("Error getting volume for %s: %v", processName, err)
+				simpleVolumeDispatch.Release()
+				sessionControl2Dispatch.Release()
+				sessionControl.Release()
+				continue
+			}
+
+			// Convert scalar (0.0-1.0) to percentage (0-100)
+			volumePercentage := int(volumeScalar * 100)
+
+			simpleVolumeDispatch.Release()
+			sessionControl2Dispatch.Release()
+			sessionControl.Release()
+
+			return volumePercentage
+		}
+
+		sessionControl2Dispatch.Release()
+		sessionControl.Release()
+	}
+
+	if verbose {
+		log.Printf("Application %s not found or not playing audio", processName)
+	}
+	return -1
 }
 
 func getProcessName(pid uint32) string {
