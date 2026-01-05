@@ -517,6 +517,56 @@ func setSystemVolume(percentage int) {
 	}
 }
 
+func getSystemVolume() int {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
+	// Get default audio endpoint (speakers)
+	var mmde *wca.IMMDeviceEnumerator
+	if err := wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return -1
+	}
+	if mmde != nil {
+		defer mmde.Release()
+	}
+
+	var mmDevice *wca.IMMDevice
+	if err := mmde.GetDefaultAudioEndpoint(wca.ERender, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default audio endpoint: %v", err)
+		return -1
+	}
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
+
+	var endpointVolume *wca.IAudioEndpointVolume
+	if err := mmDevice.Activate(wca.IID_IAudioEndpointVolume, wca.CLSCTX_ALL, nil, &endpointVolume); err != nil {
+		log.Printf("Error activating audio endpoint: %v", err)
+		return -1
+	}
+	if endpointVolume != nil {
+		defer endpointVolume.Release()
+	}
+
+	// Get master volume as a float between 0.0 and 1.0
+	var vol float32
+	err := endpointVolume.GetMasterVolumeLevelScalar(&vol)
+	if err != nil {
+		log.Printf("Error getting master volume: %v", err)
+		return -1
+	}
+
+	percent := int(vol * 100)
+	if verbose {
+		fmt.Printf("[Volume] Current volume: %d%%\n", percent)
+	}
+	return percent
+}
+
 func setMicrophoneVolume(percentage int) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
