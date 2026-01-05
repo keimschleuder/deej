@@ -57,7 +57,7 @@ var (
 
 	lastForegroundWindowName string
 	lastSliderValues         []int
-	userActive               bool
+	lastUserActivity         time.Time
 )
 
 func main() {
@@ -252,13 +252,12 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 		} else if line == "PONG" {
 			fmt.Println("[Arduino] PONG received")
 		} else {
-			userActive = true
+			lastUserActivity = time.Now()
 			// Parse sensor data: s0v75|b1v1
 			msg := parseArduinoData(line)
 			if len(msg.SliderValues) > 0 || len(msg.ButtonStates) > 0 {
 				msgChan <- msg
 			}
-			userActive = false
 		}
 	}
 }
@@ -391,7 +390,7 @@ func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
 
 func TrackVolumeChanges(port io.ReadWriteCloser, interval time.Duration) {
 	for {
-		if userActive {
+		if time.Since(lastUserActivity) < time.Second*2 {
 			time.Sleep(interval)
 			continue
 		}
