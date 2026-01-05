@@ -57,6 +57,7 @@ var (
 
 	lastForegroundWindowName string
 	lastSliderValues         []int
+	userActive               bool
 )
 
 func main() {
@@ -123,6 +124,8 @@ func main() {
 	if currentWindowSlider >= 0 {
 		go TrackCurrentProcessChanges(port, currentWindowSlider)
 	}
+
+	go TrackVolumeChanges(port, time.Second)
 
 	// Main loop: handle user input
 	handleUserInput(port)
@@ -249,11 +252,13 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 		} else if line == "PONG" {
 			fmt.Println("[Arduino] PONG received")
 		} else {
+			userActive = true
 			// Parse sensor data: s0v75|b1v1
 			msg := parseArduinoData(line)
 			if len(msg.SliderValues) > 0 || len(msg.ButtonStates) > 0 {
 				msgChan <- msg
 			}
+			userActive = false
 		}
 	}
 }
@@ -291,7 +296,7 @@ func parseArduinoData(data string) ArduinoMessage {
 					case "mic":
 						go setMicrophoneVolume(value)
 					case "deej.current":
-						processName, err := CurrentProcessName()
+						processName, err := getCurrentProcessName()
 						if err != nil {
 							log.Println(err)
 							continue
@@ -330,7 +335,7 @@ func parseArduinoData(data string) ArduinoMessage {
 	return msg
 }
 
-func CurrentProcessName() (string, error) {
+func getCurrentProcessName() (string, error) {
 	hwnd, _, err := procGetForegroundWindow.Call()
 	if hwnd == 0 {
 		return "", err
@@ -365,7 +370,7 @@ func CurrentProcessName() (string, error) {
 
 func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
 	for {
-		processName, err := CurrentProcessName()
+		processName, err := getCurrentProcessName()
 		if err != nil {
 			// log.Println(err)
 			continue
@@ -381,6 +386,68 @@ func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
 			}
 			lastForegroundWindowName = processName
 		}
+	}
+}
+
+func TrackVolumeChanges(port io.ReadWriteCloser, interval time.Duration) {
+	for {
+		if userActive {
+			time.Sleep(interval)
+			continue
+		}
+		for sliderNum, targets := range sliderTargetsMapping {
+			var currentVolume int
+			var myVolume int
+			firstItem := true
+			allTheSame := true
+			for _, target := range targets {
+				switch target {
+				case "master":
+					myVolume = getSystemVolume()
+				case "mic":
+					myVolume = getMicrophoneVolume()
+				case "deej.current":
+					processName, err := getCurrentProcessName()
+					if err != nil {
+						continue
+					}
+					myVolume = getApplicationVolume(processName)
+				case "deej.unmapped":
+					// TODO
+					continue
+				default:
+					if strings.HasSuffix(strings.ToLower(target), ".exe") {
+						myVolume = getApplicationVolume(target)
+					} else {
+						continue
+					}
+				}
+				if firstItem || myVolume == currentVolume {
+					currentVolume = myVolume
+				} else {
+					allTheSame = false
+				}
+				firstItem = false
+			}
+			if currentVolume < 0 {
+				continue // app not found or not playing audio
+			}
+			if allTheSame {
+				// Compare with last slider value
+				if currentVolume != lastSliderValues[sliderNum] {
+					// Update Arduino slider
+					sendCommand(port, fmt.Sprintf("SET:%d:%d", sliderNum, currentVolume))
+					lastSliderValues[sliderNum] = currentVolume
+
+					if verbose {
+						fmt.Printf("[Sync] Slider %d updated to %d%%\n", sliderNum, currentVolume)
+					}
+				}
+			}
+
+		}
+
+		time.Sleep(interval)
 	}
 }
 
@@ -436,7 +503,7 @@ func setUnmappedApplicationsVolume(volume int) {
 	}
 
 	// Current foreground process to exclude
-	currentApp, err := CurrentProcessName()
+	currentApp, err := getCurrentProcessName()
 	if err != nil {
 		currentApp = ""
 	}
@@ -610,6 +677,50 @@ func setMicrophoneVolume(percentage int) {
 	} else if verbose {
 		fmt.Printf("[Microphone] Set to %d%%\n", percentage)
 	}
+}
+
+// Helper function to get microphone volume as int 0-100
+func getMicrophoneVolume() int {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+	defer ole.CoUninitialize()
+
+	var mmde *wca.IMMDeviceEnumerator
+	if err := wca.CoCreateInstance(wca.CLSID_MMDeviceEnumerator, 0, wca.CLSCTX_ALL, wca.IID_IMMDeviceEnumerator, &mmde); err != nil {
+		log.Printf("Error creating device enumerator: %v", err)
+		return -1
+	}
+	if mmde != nil {
+		defer mmde.Release()
+	}
+
+	var mmDevice *wca.IMMDevice
+	if err := mmde.GetDefaultAudioEndpoint(wca.ECapture, wca.EConsole, &mmDevice); err != nil {
+		log.Printf("Error getting default microphone: %v", err)
+		return -1
+	}
+	if mmDevice != nil {
+		defer mmDevice.Release()
+	}
+
+	var endpointVolume *wca.IAudioEndpointVolume
+	if err := mmDevice.Activate(wca.IID_IAudioEndpointVolume, wca.CLSCTX_ALL, nil, &endpointVolume); err != nil {
+		log.Printf("Error activating endpoint volume: %v", err)
+		return -1
+	}
+	if endpointVolume != nil {
+		defer endpointVolume.Release()
+	}
+
+	var vol float32
+	if err := endpointVolume.GetMasterVolumeLevelScalar(&vol); err != nil {
+		log.Printf("Error getting microphone volume: %v", err)
+		return -1
+	}
+
+	return int(vol * 100)
 }
 
 func setApplicationVolume(processName string, percentage int) {
