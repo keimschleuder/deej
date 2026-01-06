@@ -46,7 +46,7 @@ func main() {
 	defer port.Close()
 
 	// Wait for Arduino to reset
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	log.Printf("Connected to Arduino on %s at %d baud\n", SERIAL_PORT, BAUD_RATE)
 
 	// Flush any initial data
@@ -78,7 +78,7 @@ func main() {
 			requestIndex++
 
 			if requestIndex >= 4 {
-				// Check for request command "REQ\x00"
+				// Check for request command "REQ\n"
 				if requestBuffer[0] == 'R' && requestBuffer[1] == 'E' &&
 					requestBuffer[2] == 'Q' && requestBuffer[3] == '\n' {
 					log.Println("\n=== Image requested by Arduino ===")
@@ -97,7 +97,7 @@ func main() {
 
 func sendImage(port io.ReadWriteCloser) error {
 	// Read the image file
-	log.Printf("Reading image from: %s", imagePath)
+	log.Printf("Reading image from:  %s", imagePath)
 	imageData, err := os.ReadFile(imagePath)
 	if err != nil {
 		return fmt.Errorf("failed to read image file: %v", err)
@@ -108,19 +108,19 @@ func sendImage(port io.ReadWriteCloser) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode image: %v", err)
 	}
-	log.Printf("Decoded %s image: %dx%d", format, img.Bounds().Dx(), img.Bounds().Dy())
+	log.Printf("Decoded %s image:  %dx%d", format, img.Bounds().Dx(), img.Bounds().Dy())
 
 	// Resize image
-	log.Printf("Resizing to %dx%d...", TARGET_WIDTH, TARGET_HEIGHT)
+	log.Printf("Resizing to %dx%d.. .", TARGET_WIDTH, TARGET_HEIGHT)
 	resized := resize.Resize(TARGET_WIDTH, TARGET_HEIGHT, img, resize.Lanczos3)
 
-	// Convert to raw RGB data
-	rgbData := imageToRGB(resized)
-	log.Printf("RGB data size: %d bytes", len(rgbData))
+	// Convert to RGB565 data
+	rgb565Data := imageToRGB565(resized)
+	log.Printf("RGB565 data size:  %d bytes", len(rgb565Data))
 
-	// Send header: "IMG\n"
+	// Send header:  "IMG\n"
 	header := []byte{'I', 'M', 'G', '\n'}
-	size := uint32(len(rgbData))
+	size := uint32(len(rgb565Data))
 	header = append(header, byte(size>>24), byte(size>>16), byte(size>>8), byte(size))
 
 	log.Println("Sending header...")
@@ -131,8 +131,8 @@ func sendImage(port io.ReadWriteCloser) error {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Send RGB data in chunks (one line at a time for smooth display)
-	bytesPerLine := TARGET_WIDTH * 3
+	// Send RGB565 data in chunks (one line at a time for smooth display)
+	bytesPerLine := TARGET_WIDTH * 2 // 2 bytes per pixel for RGB565
 	totalLines := TARGET_HEIGHT
 	log.Printf("Sending %d lines of %d bytes each...", totalLines, bytesPerLine)
 
@@ -140,13 +140,12 @@ func sendImage(port io.ReadWriteCloser) error {
 		start := line * bytesPerLine
 		end := start + bytesPerLine
 
-		_, err = port.Write(rgbData[start:end])
+		_, err = port.Write(rgb565Data[start:end])
 		if err != nil {
 			return fmt.Errorf("failed to write line %d: %v", line, err)
 		}
 
-		// Log progress every 8 lines
-		if (line+1)%8 == 0 {
+		if (line+1)%10 == 0 {
 			progress := ((line + 1) * 100) / totalLines
 			log.Printf("Progress: %d%% (%d/%d lines)", progress, line+1, totalLines)
 		}
@@ -159,24 +158,34 @@ func sendImage(port io.ReadWriteCloser) error {
 	return nil
 }
 
-func imageToRGB(img image.Image) []byte {
+func imageToRGB565(img image.Image) []byte {
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
 
-	rgbData := make([]byte, width*height*3)
+	// 2 bytes per pixel for RGB565
+	rgb565Data := make([]byte, width*height*2)
 	index := 0
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			r, g, b, _ := img.At(x, y).RGBA()
+
 			// Convert from 16-bit to 8-bit
-			rgbData[index] = uint8(r >> 8)
-			rgbData[index+1] = uint8(g >> 8)
-			rgbData[index+2] = uint8(b >> 8)
-			index += 3
+			r8 := uint16(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b >> 8)
+
+			// Convert RGB888 to RGB565
+			// RGB565:  RRRRRGGGGGGBBBBB
+			rgb565 := uint16((r8&0xF8)<<8) | uint16((g8&0xFC)<<3) | uint16(b8>>3)
+
+			// Send as big-endian (high byte first)
+			rgb565Data[index] = uint8(rgb565 >> 8)
+			rgb565Data[index+1] = uint8(rgb565 & 0xFF)
+			index += 2
 		}
 	}
 
-	return rgbData
+	return rgb565Data
 }
