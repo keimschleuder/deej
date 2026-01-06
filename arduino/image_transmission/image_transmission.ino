@@ -125,8 +125,6 @@ void handleSize(uint8_t inByte) {
     lineBufferIndex = 0;
     currentState = RECEIVING_IMAGE;
     headerIndex = 0;
-    
-    tft.fillRect(IMAGE_X, IMAGE_Y, IMAGE_WIDTH, IMAGE_HEIGHT, ST77XX_GREEN);
   }
 }
 
@@ -143,17 +141,22 @@ void handleImageData(uint8_t inByte) {
   
   if (bytesReceived >= imageSize) {
     currentState = WAITING_FOR_HEADER;
-    delay(300 * 1000);
+    delay(30 * 1000);
     requestImage();
   }
 }
 
 void drawLine(uint16_t y) {
+  // Buffer als 16-bit interpretieren
+  uint16_t* colorBuffer = (uint16_t*)lineBuffer;
+  
+  // Byte-Order korrigieren (falls nötig)
   for (uint16_t x = 0; x < IMAGE_WIDTH; x++) {
     uint16_t bufferIndex = x * 2;
-    uint16_t color = ((uint16_t)lineBuffer[bufferIndex] << 8) | lineBuffer[bufferIndex + 1];
-    tft.drawPixel(IMAGE_X + x, IMAGE_Y + y, color);
+    colorBuffer[x] = ((uint16_t)lineBuffer[bufferIndex] << 8) | lineBuffer[bufferIndex + 1];
   }
+  
+  tft. drawRGBBitmap(IMAGE_X, IMAGE_Y + y, colorBuffer, IMAGE_WIDTH, 1);
 }
 
 void requestImage() {

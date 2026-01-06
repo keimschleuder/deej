@@ -173,12 +173,12 @@ func imageToRGB565(img image.Image) []byte {
 
 			// Convert from 16-bit to 8-bit
 			r8 := uint16(r >> 8)
-			g8 := uint8(g >> 8)
-			b8 := uint8(b >> 8)
+			g8 := uint16(g >> 8)
+			b8 := uint16(b >> 8)
 
 			// Convert RGB888 to RGB565
 			// RGB565:  RRRRRGGGGGGBBBBB
-			rgb565 := uint16((r8&0xF8)<<8) | uint16((g8&0xFC)<<3) | uint16(b8>>3)
+			rgb565 := uint16((b8&0xF8)<<8) | uint16((g8&0xFC)<<3) | uint16(r8>>3)
 
 			// Send as big-endian (high byte first)
 			rgb565Data[index] = uint8(rgb565 >> 8)
