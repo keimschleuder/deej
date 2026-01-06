@@ -73,11 +73,10 @@ void setup() {
 }
 
 void loop() {
-  
   while (Serial.available() > 0) {
     uint8_t inByte = Serial.read();
     
-    delay(500);
+    delay(100);
 
     switch (currentState) {
       case WAITING_FOR_HEADER:
@@ -127,7 +126,7 @@ void handleSize(uint8_t inByte) {
     currentState = RECEIVING_IMAGE;
     headerIndex = 0;
     
-    tft.fillRect(IMAGE_X, IMAGE_Y, IMAGE_WIDTH, IMAGE_HEIGHT, ST77XX_BLUE);
+    tft.fillRect(IMAGE_X, IMAGE_Y, IMAGE_WIDTH, IMAGE_HEIGHT, ST77XX_GREEN);
   }
 }
 
