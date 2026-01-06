@@ -40,23 +40,6 @@ uint32_t bytesReceived = 0;
 uint16_t currentLine = 0;
 uint16_t lineBufferIndex = 0;
 
-void debugPrint(const char* msg) {
-  tft.fillRect(0, 110, 160, 18, ST77XX_BLACK);
-  tft.setCursor(0, 110);
-  tft.setTextColor(ST77XX_YELLOW);
-  tft.setTextSize(1);
-  tft.print(msg);
-}
-
-void debugPrintNum(const char* msg, uint32_t num) {
-  tft. fillRect(0, 110, 160, 18, ST77XX_BLACK);
-  tft. setCursor(0, 110);
-  tft.setTextColor(ST77XX_YELLOW);
-  tft.setTextSize(1);
-  tft. print(msg);
-  tft.print(num);
-}
-
 void setup() {
   Serial.begin(115200);
   
@@ -90,24 +73,11 @@ void setup() {
 }
 
 void loop() {
-  // debugPrint("Loop");
-  if (Serial.available() > 0) {
-    // debugPrint("Serial Started");
+  
+  while (Serial.available() > 0) {
     uint8_t inByte = Serial.read();
-    // debugPrint("Daten gelesen");
     
-    // Zeige empfangenes Byte an
-    tft.fillRect(0, 110, 160, 18, ST77XX_BLACK);
-    tft.setCursor(0, 110);
-    tft.setTextColor(ST77XX_GREEN);
-    tft.setTextSize(1);
-    tft.print("Byte:  0x");
-    tft.print(inByte, HEX);
-    tft.print(" '");
-    tft.print((char)inByte);
-    tft.print("'");
-    
-    delay(500);  // Halbe Sekunde warten, damit du es lesen kannst
+    delay(500);
 
     switch (currentState) {
       case WAITING_FOR_HEADER:
@@ -126,7 +96,6 @@ void loop() {
 }
 
 void handleHeader(uint8_t inByte) {
-  debugPrint("Receiving Header");
   headerBuffer[headerIndex++] = inByte;
   
   if (headerIndex >= 4) {
@@ -159,52 +128,23 @@ void handleSize(uint8_t inByte) {
     headerIndex = 0;
     
     tft.fillRect(IMAGE_X, IMAGE_Y, IMAGE_WIDTH, IMAGE_HEIGHT, ST77XX_BLUE);
-    debugPrint("Receiving...");
   }
 }
 
 void handleImageData(uint8_t inByte) {
-  lineBufferIndex++;
   lineBuffer[lineBufferIndex] = inByte;
+  lineBufferIndex++;  
   bytesReceived++;
   
   if (lineBufferIndex >= IMAGE_WIDTH * 2) {
-    debugPrint("Drawing Line");
     drawLine(currentLine);
-    
-    // Debug: Show first line's pixel values
-    if (currentLine == 0) {
-      tft.fillRect(0, 100, 160, 10, ST77XX_BLACK);
-      tft.setCursor(0, 100);
-      tft.setTextColor(ST77XX_GREEN);
-      tft.setTextSize(1);
-      
-      // Show first few bytes received
-      tft.print("B:");
-      for (int i = 0; i < 8; i++) {
-        tft.print(lineBuffer[i], HEX);
-        tft.print(" ");
-      }
-    }
-    
-    // Debug: Show first pixel color on line 1
-    if (currentLine == 1) {
-      uint16_t firstColor = ((uint16_t)lineBuffer[0] << 8) | lineBuffer[1];
-      debugPrintNum("Color0:  0x", firstColor);
-      
-      // Also draw a test rectangle with this color
-      tft.fillRect(0, 0, 20, 20, firstColor);
-    }
-    
     currentLine++;
     lineBufferIndex = 0;
   }
   
   if (bytesReceived >= imageSize) {
-    debugPrint("Done!");
     currentState = WAITING_FOR_HEADER;
-    
-    delay(5000);
+    delay(300 * 1000);
     requestImage();
   }
 }
@@ -218,6 +158,5 @@ void drawLine(uint16_t y) {
 }
 
 void requestImage() {
-  debugPrint("Sending REQ...");
   Serial.print("REQ\n");
 }
