@@ -39,6 +39,7 @@ uint32_t imageSize = 0;
 uint32_t bytesReceived = 0;
 uint16_t currentLine = 0;
 uint16_t lineBufferIndex = 0;
+bool firstImgByte = true;
 
 void setup() {
   Serial.begin(115200);
@@ -48,6 +49,7 @@ void setup() {
   
   // Set rotation to landscape mode
   tft. setRotation(1);
+  tft.setSPISpeed(8000000);
   
   // Clear screen
   tft. fillScreen(ST77XX_BLACK);
@@ -63,8 +65,7 @@ void setup() {
     delay(10);
   }
   
-  tft.fillScreen(ST77XX_BLACK);
-  tft.setCursor(10, 50);
+  tft.setCursor(10, 60);
   tft.println("USB connected!");
   delay(3000);
   
@@ -87,7 +88,7 @@ void loop() {
         handleSize(inByte);
         break;
         
-      case RECEIVING_IMAGE: 
+      case RECEIVING_IMAGE:
         handleImageData(inByte);
         break;
     }
@@ -134,9 +135,20 @@ void handleImageData(uint8_t inByte) {
   bytesReceived++;
   
   if (lineBufferIndex >= IMAGE_WIDTH * 2) {
-    drawLine(currentLine);
     currentLine++;
     lineBufferIndex = 0;
+  }
+
+  if (firstImgByte) {
+    firstImgByte = false;
+  } else {
+    firstImgByte = true;
+    // Buffer als 16-bit interpretieren
+    uint16_t* colorBuffer = (uint16_t*)lineBuffer;
+
+    uint16_t color = ((uint16_t)lineBuffer[lineBufferIndex] << 8) | lineBuffer[lineBufferIndex + 1];
+
+    tft.drawPixel((lineBufferIndex / 2) + IMAGE_X, currentLine + IMAGE_Y, color);
   }
   
   if (bytesReceived >= imageSize) {
@@ -144,19 +156,6 @@ void handleImageData(uint8_t inByte) {
     delay(30 * 1000);
     requestImage();
   }
-}
-
-void drawLine(uint16_t y) {
-  // Buffer als 16-bit interpretieren
-  uint16_t* colorBuffer = (uint16_t*)lineBuffer;
-  
-  // Byte-Order korrigieren (falls nötig)
-  for (uint16_t x = 0; x < IMAGE_WIDTH; x++) {
-    uint16_t bufferIndex = x * 2;
-    colorBuffer[x] = ((uint16_t)lineBuffer[bufferIndex] << 8) | lineBuffer[bufferIndex + 1];
-  }
-  
-  tft. drawRGBBitmap(IMAGE_X, IMAGE_Y + y, colorBuffer, IMAGE_WIDTH, 1);
 }
 
 void requestImage() {
