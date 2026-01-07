@@ -118,43 +118,31 @@ func sendImage(port io.ReadWriteCloser) error {
 	rgb565Data := imageToRGB565(resized)
 	log.Printf("RGB565 data size:  %d bytes", len(rgb565Data))
 
-	// Send header:  "IMG\n"
+	// Send header: "IMG\n"
 	header := []byte{'I', 'M', 'G', '\n'}
-	size := uint32(len(rgb565Data))
-	header = append(header, byte(size>>24), byte(size>>16), byte(size>>8), byte(size))
-
 	log.Println("Sending header...")
 	_, err = port.Write(header)
 	if err != nil {
 		return fmt.Errorf("failed to write header: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
-	// Send RGB565 data in chunks (one line at a time for smooth display)
-	bytesPerLine := TARGET_WIDTH * 2 // 2 bytes per pixel for RGB565
-	totalLines := TARGET_HEIGHT
-	log.Printf("Sending %d lines of %d bytes each...", totalLines, bytesPerLine)
+	// Send size as 4 bytes
+	size := uint32(len(rgb565Data))
+	sizeBytes := []byte{byte(size >> 24), byte(size >> 16), byte(size >> 8), byte(size)}
+	log.Println("Sending size...")
 
-	for line := 0; line < totalLines; line++ {
-		start := line * bytesPerLine
-		end := start + bytesPerLine
-
-		_, err = port.Write(rgb565Data[start:end])
-		if err != nil {
-			return fmt.Errorf("failed to write line %d: %v", line, err)
-		}
-
-		if (line+1)%10 == 0 {
-			progress := ((line + 1) * 100) / totalLines
-			log.Printf("Progress: %d%% (%d/%d lines)", progress, line+1, totalLines)
-		}
-
-		// Small delay between lines
-		time.Sleep(5 * time.Millisecond)
+	n, err := port.Write(sizeBytes)
+	log.Printf("Sent %d size bytes:  %v", n, sizeBytes)
+	if err != nil {
+		return fmt.Errorf("failed to write header: %v", err)
 	}
 
-	log.Println("All data sent!")
+	time.Sleep(50 * time.Millisecond)
+
+	// TODO: Send Image
+
 	return nil
 }
 

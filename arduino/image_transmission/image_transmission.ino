@@ -33,7 +33,6 @@ enum State {
 };
 
 State currentState = WAITING_FOR_HEADER;
-uint8_t headerBuffer[4];
 uint8_t headerIndex = 0;
 uint32_t imageSize = 0;
 uint32_t bytesReceived = 0;
@@ -57,7 +56,7 @@ void setup() {
   // Display startup message
   tft.setTextColor(ST77XX_WHITE);
   tft.setTextSize(1);
-  tft.setCursor(10, 50);
+  tft.setCursor(10, 0);
   tft.println("Waiting for USB...");
   
   // Wait for USB serial connection
@@ -65,7 +64,7 @@ void setup() {
     delay(10);
   }
   
-  tft.setCursor(10, 60);
+  tft.setCursor(10, 10);
   tft.println("USB connected!");
   delay(3000);
   
@@ -73,88 +72,82 @@ void setup() {
   requestImage();
 }
 
-void loop() {
-  while (Serial.available() > 0) {
-    uint8_t inByte = Serial.read();
-    
-    delay(100);
+bool sizeReadAttempted = false;
+bool sizeReadSuccessful = false;
 
+void loop() {
+  if (!sizeReadAttempted && Serial.available() > 0) {
+    handleSize();
+    sizeReadAttempted = true;
+  } else if (sizeReadSuccessful) {
+    tft.fillScreen(ST77XX_GREEN);
+  } else {
+    tft.fillScreen(ST77XX_RED);
+  }
+}
+
+/*
+void loop() {
+  if (Serial.available() > 0 && currentState == WAITING_FOR_HEADER) {
+    handleSize();
+  }
+  while (Serial.available() > 0) {
     switch (currentState) {
       case WAITING_FOR_HEADER:
-        handleHeader(inByte);
+        handleHeader();
         break;
         
       case READING_SIZE:
-        handleSize(inByte);
+        handleSize();
         break;
         
       case RECEIVING_IMAGE:
-        handleImageData(inByte);
+        delay(2500);
+        currentState = WAITING_FOR_HEADER;
+        requestImage();
         break;
     }
+  } 
+} */
+
+// Working and tested
+void handleHeader() {
+  String input = Serial.readStringUntil('\n');
+
+  if (input == 'IMG') {
+    currentState = READING_SIZE;
   }
 }
 
-void handleHeader(uint8_t inByte) {
-  headerBuffer[headerIndex++] = inByte;
+void handleSize() {
+  unsigned long start = millis();
   
-  if (headerIndex >= 4) {
-    if (headerBuffer[0] == 'I' && headerBuffer[1] == 'M' &&
-        headerBuffer[2] == 'G' && headerBuffer[3] == '\n') {
-      currentState = READING_SIZE;
-      headerIndex = 0;
-    } else {
-      headerBuffer[0] = headerBuffer[1];
-      headerBuffer[1] = headerBuffer[2];
-      headerBuffer[2] = headerBuffer[3];
-      headerIndex = 3;
+  while(Serial.available() < 4) {
+    if (millis() - start > 3000) { // Timeout nach 3 Sekunden
+      tft.println("\nTIMEOUT!");
+      tft.print("Avail: ");
+      tft.println(Serial.available());
+      return; 
     }
   }
-}
 
-void handleSize(uint8_t inByte) {
-  headerBuffer[headerIndex++] = inByte;
+  uint8_t bytes[4];
+  for(int i=0; i<4; i++) {
+    bytes[i] = Serial.read();
+  }
+
+  imageSize = ((uint32_t)bytes[0] << 24) |
+              ((uint32_t)bytes[1] << 16) |
+              ((uint32_t)bytes[2] << 8) |
+              ((uint32_t)bytes[3]);
   
-  if (headerIndex >= 4) {
-    imageSize = ((uint32_t)headerBuffer[0] << 24) |
-                ((uint32_t)headerBuffer[1] << 16) |
-                ((uint32_t)headerBuffer[2] << 8) |
-                ((uint32_t)headerBuffer[3]);
-    
-    bytesReceived = 0;
-    currentLine = 0;
-    lineBufferIndex = 0;
+  if (imageSize > 0 && imageSize < 50000) {
     currentState = RECEIVING_IMAGE;
-    headerIndex = 0;
-  }
-}
-
-void handleImageData(uint8_t inByte) {
-  lineBuffer[lineBufferIndex] = inByte;
-  lineBufferIndex++;  
-  bytesReceived++;
-  
-  if (lineBufferIndex >= IMAGE_WIDTH * 2) {
-    currentLine++;
-    lineBufferIndex = 0;
-  }
-
-  if (firstImgByte) {
-    firstImgByte = false;
+    if (imageSize == IMAGE_HEIGHT * IMAGE_WIDTH * 2) { 
+      sizeReadSuccessful = true; 
+    }
   } else {
-    firstImgByte = true;
-    // Buffer als 16-bit interpretieren
-    uint16_t* colorBuffer = (uint16_t*)lineBuffer;
-
-    uint16_t color = ((uint16_t)lineBuffer[lineBufferIndex] << 8) | lineBuffer[lineBufferIndex + 1];
-
-    tft.drawPixel((lineBufferIndex / 2) + IMAGE_X, currentLine + IMAGE_Y, color);
-  }
-  
-  if (bytesReceived >= imageSize) {
-    currentState = WAITING_FOR_HEADER;
-    delay(30 * 1000);
-    requestImage();
+     tft.println("Size invalid");
   }
 }
 
