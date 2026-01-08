@@ -19,8 +19,8 @@ const (
 	SERIAL_PORT = "COM9"
 	BAUD_RATE   = 115200
 
-	TARGET_WIDTH  = 100
-	TARGET_HEIGHT = 100
+	TARGET_WIDTH  = 25
+	TARGET_HEIGHT = 25
 
 	imagePath = `C:\Users\nikla\Documents\GitHub\deej\arduino\image_transmission\image.jpg`
 )
@@ -133,12 +133,16 @@ func sendImage(port io.ReadWriteCloser) error {
 
 	_, err = port.Write(sizeBytes)
 	if err != nil {
-		return fmt.Errorf("failed to write header: %v", err)
+		return fmt.Errorf("failed to write size: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	log.Println("Sending Image data")
 
-	// TODO: Send Image
+	_, err = port.Write(rgb565Data)
+	if err != nil {
+		return fmt.Errorf("Failed to Send the Image Data: %v", err)
+	}
+	log.Println("All Data sent")
 
 	return nil
 }
