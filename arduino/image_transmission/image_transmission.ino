@@ -12,8 +12,8 @@
 #define DISPLAY_HEIGHT 128
 
 // Image dimensions (must match Go program)
-#define IMAGE_WIDTH  100
-#define IMAGE_HEIGHT 100
+#define IMAGE_WIDTH  25
+#define IMAGE_HEIGHT 25
 
 // Position to display image
 #define IMAGE_X 30
@@ -35,9 +35,9 @@ enum State {
 State currentState = WAITING_FOR_HEADER;
 uint8_t headerIndex = 0;
 uint32_t imageSize = 0;
-uint32_t bytesReceived = 0;
+uint32_t pixelsRecieved = 0;
 uint16_t currentLine = 0;
-uint16_t lineBufferIndex = 0;
+uint16_t currentColumn = 0;
 bool firstImgByte = true;
 
 void setup() {
@@ -72,8 +72,6 @@ void setup() {
   requestImage();
 }
 
-bool sizeReadSuccessful = false;
-
 void loop() {
   while (Serial.available() > 0) {
     switch (currentState) {
@@ -86,22 +84,60 @@ void loop() {
         break;
         
       case RECEIVING_IMAGE:
-        if (sizeReadSuccessful) {
-          tft.fillScreen(ST77XX_GREEN);
-        } else {
-          tft.fillScreen(ST77XX_RED);
-        }
+        handleImageData();
         break;
     }
   }
-  if (sizeReadSuccessful) {
-    tft.fillScreen(ST77XX_GREEN);
-  } else {
-    tft.fillScreen(ST77XX_RED);
+}
+
+void handleImageData() {
+  unsigned long start = millis();
+  
+  while(Serial.available() < 2) {
+    if (millis() - start > 3000) { // Timeout nach 3 Sekunden
+      tft.println("\nTIMEOUT!");
+      tft.print("Available: ");
+      tft.println(Serial.available());
+      return; 
+    }
+  }
+
+  uint8_t imageData[2];
+  for(int i=0; i<2; i++) {
+    imageData[i] = Serial.read();
+  }
+
+  delay(100);
+  
+  uint16_t color = ((uint16_t)imageData[0] << 8) | imageData[1];
+  tft.drawPixel(currentColumn + IMAGE_X, currentLine + IMAGE_Y, color);
+
+  currentColumn++;
+  pixelsRecieved++;
+  if (currentColumn >= IMAGE_WIDTH) {
+    currentColumn = 0;
+    currentLine++;
+  }
+  if ((pixelsRecieved * 2) >= imageSize) {
+    // Reset Variables
+    currentColumn = 0;
+    currentLine = 0;
+    pixelsRecieved = 0;
+
+    currentState = WAITING_FOR_HEADER;
+    // TFT Logging
+    tft.setCursor(IMAGE_X, IMAGE_Y + IMAGE_HEIGHT + 5);
+    tft.println("Completed");
+    delay(10 * 1000);
+    tft.fillRect(IMAGE_X, IMAGE_Y + IMAGE_HEIGHT + 5, 100, 10, ST77XX_BLACK);
+    delay(500);
+
+    // Request new image
+    requestImage();
   }
 }
 
-// Working and tested
+// Working and tested - No delays
 void handleHeader() {
   String input = Serial.readStringUntil('\n');
 
@@ -134,9 +170,6 @@ void handleSize() {
   
   if (imageSize > 0 && imageSize < 50000) {
     currentState = RECEIVING_IMAGE;
-    if (imageSize == IMAGE_HEIGHT * IMAGE_WIDTH * 2) { 
-      sizeReadSuccessful = true; 
-    }
   } else {
      tft.println("Size invalid");
   }
