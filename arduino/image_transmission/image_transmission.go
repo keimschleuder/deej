@@ -126,15 +126,12 @@ func sendImage(port io.ReadWriteCloser) error {
 		return fmt.Errorf("failed to write header: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
 	// Send size as 4 bytes
 	size := uint32(len(rgb565Data))
 	sizeBytes := []byte{byte(size >> 24), byte(size >> 16), byte(size >> 8), byte(size)}
 	log.Println("Sending size...")
 
-	n, err := port.Write(sizeBytes)
-	log.Printf("Sent %d size bytes:  %v", n, sizeBytes)
+	_, err = port.Write(sizeBytes)
 	if err != nil {
 		return fmt.Errorf("failed to write header: %v", err)
 	}

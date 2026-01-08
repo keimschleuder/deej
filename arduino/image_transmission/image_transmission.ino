@@ -72,9 +72,9 @@ void setup() {
   requestImage();
 }
 
-bool sizeReadAttempted = false;
 bool sizeReadSuccessful = false;
 
+/* bool sizeReadAttempted = false;
 void loop() {
   if (!sizeReadAttempted && Serial.available() > 0) {
     handleSize();
@@ -84,13 +84,9 @@ void loop() {
   } else {
     tft.fillScreen(ST77XX_RED);
   }
-}
+} */
 
-/*
 void loop() {
-  if (Serial.available() > 0 && currentState == WAITING_FOR_HEADER) {
-    handleSize();
-  }
   while (Serial.available() > 0) {
     switch (currentState) {
       case WAITING_FOR_HEADER:
@@ -102,13 +98,20 @@ void loop() {
         break;
         
       case RECEIVING_IMAGE:
-        delay(2500);
-        currentState = WAITING_FOR_HEADER;
-        requestImage();
+        if (sizeReadSuccessful) {
+          tft.fillScreen(ST77XX_GREEN);
+        } else {
+          tft.fillScreen(ST77XX_RED);
+        }
         break;
     }
-  } 
-} */
+  }
+  if (sizeReadSuccessful) {
+    tft.fillScreen(ST77XX_GREEN);
+  } else {
+    tft.fillScreen(ST77XX_RED);
+  }
+}
 
 // Working and tested
 void handleHeader() {
@@ -125,7 +128,7 @@ void handleSize() {
   while(Serial.available() < 4) {
     if (millis() - start > 3000) { // Timeout nach 3 Sekunden
       tft.println("\nTIMEOUT!");
-      tft.print("Avail: ");
+      tft.print("Available: ");
       tft.println(Serial.available());
       return; 
     }
