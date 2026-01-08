@@ -103,7 +103,10 @@ void handleData() {
   if (title.indexOf('(', 5)){
     title = title.substring(0, title.indexOf('(', 5) - 1);
   }
-  if (title.length() > 13) {
+  if (title.indexOf('-', 12)){
+    title = title.substring(0, title.indexOf('-', 12) - 1);
+  }
+  if (title.length() > 10) {
     titleSize = 1;
   }
   uint8_t start_x_title = 0;

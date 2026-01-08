@@ -95,6 +95,7 @@ func main() {
 					if trackInfo != lastTrackInfo {
 						lastTrackInfo = trackInfo
 					}
+					log.Println("Got Track Data")
 					err = sendImage(port)
 					if err != nil {
 						log.Printf("Error sending image: %v", err)
