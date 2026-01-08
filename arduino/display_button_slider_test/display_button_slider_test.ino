@@ -14,9 +14,9 @@ const int NUM_BUTTONS = 6;
 const int buttonInputs[NUM_BUTTONS] = { 13, 12, 11, 10, 1, 0 };
 const float noiseReduction = 1;
 
-float percentSliderValues[NUM_SLIDERS];
-float lastSliderValues[NUM_SLIDERS];
-float secondLastSliderValues[NUM_SLIDERS];
+uint8_t percentSliderValues[NUM_SLIDERS];
+uint8_t lastSliderValues[NUM_SLIDERS];
+uint8_t secondLastSliderValues[NUM_SLIDERS];
 int lastSliderActive;
 bool buttonValues[NUM_BUTTONS];
 
@@ -135,7 +135,7 @@ void sliderGoTo(uint8_t aim, uint8_t slider) {
   if (aim != 100) {
     for (int i = 0; i < 3; i++) {
       int curr = readSlider(slider);
-      while (isEqual(curr, aim)) {
+      while (isUnequal(curr, aim)) {
         if (curr < aim) {
           steer(slider, true);
         } else {
@@ -249,7 +249,7 @@ void drawIdle() {
 }
 
 // Helper Functions
-bool isEqual(uint8_t curr, uint8_t aim) {
+bool isUnequal(uint8_t curr, uint8_t aim) {
   if (aim == 100) { return curr != 100; }
   else if (aim == 0) { return curr != 0; }  
   else { return curr != aim && curr != aim + 1 && curr != aim - 1; }
