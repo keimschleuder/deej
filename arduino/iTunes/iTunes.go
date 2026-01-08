@@ -101,6 +101,14 @@ func main() {
 					} else {
 						log.Println("Image sent successfully!")
 					}
+
+					serialMessage := trackInfo.Name + "\t" + trackInfo.Artist + "\n"
+					_, err = port.Write([]byte(serialMessage))
+					if err != nil {
+						log.Printf("Error sending image: %v", err)
+					} else {
+						log.Println("Trackdata sent successfully!")
+					}
 				}
 				requestIndex = 0
 			}

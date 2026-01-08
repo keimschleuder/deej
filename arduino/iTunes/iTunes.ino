@@ -25,7 +25,8 @@ uint8_t lineBuffer[IMAGE_WIDTH * 2];
 enum State {
   WAITING_FOR_HEADER,
   READING_SIZE,
-  RECEIVING_IMAGE
+  RECEIVING_IMAGE,
+  RECEIVING_DATA
 };
 
 State currentState = WAITING_FOR_HEADER;
@@ -80,10 +81,59 @@ void loop() {
         }
         drawLine();
         break;
+
+      case RECEIVING_DATA:
+        handleData();
+        break;
     }
   }
 }
 
+void handleData() {
+  String title = Serial.readStringUntil('\t');
+  title.trim();
+  String artist = Serial.readStringUntil('\n');
+  artist.trim();
+
+  delay(100);
+
+  tft.fillRect(0, IMAGE_Y + IMAGE_HEIGHT, tft.width(), 28, ST77XX_BLACK);
+
+  uint8_t titleSize = 2;
+  if (title.indexOf('(', 5)){
+    title = title.substring(0, title.indexOf('(', 5) - 1);
+  }
+  if (title.length() > 13) {
+    titleSize = 1;
+  }
+  uint8_t start_x_title = 0;
+  if (title.length() <= 20) {
+    start_x_title = IMAGE_X;
+  }
+
+  if (artist.length() >= 26) {
+    artist = artist.substring(0, 24) + "..";
+  }
+  uint8_t start_x_artist = IMAGE_X;
+  if (artist.length() > 20) {
+    start_x_artist = 0;
+  }
+
+  tft.setCursor(start_x_title, IMAGE_Y + IMAGE_HEIGHT + 2);
+  tft.setTextSize(titleSize);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.println(title);
+  tft.setCursor(start_x_artist, IMAGE_Y + IMAGE_HEIGHT + 20);
+  tft.setTextSize(1);
+  tft.setTextColor(46582);
+  tft.println(artist);
+
+  currentState = WAITING_FOR_HEADER;
+  delay(10 * 1000);
+  requestImage();
+}
+
+// Working and tested
 void receiveImageData(int iteration) {
   unsigned long start = millis();
   
@@ -118,13 +168,10 @@ void drawLine() {
     currentLine = 0;
     pixelsRecieved = 0;
 
-    currentState = WAITING_FOR_HEADER;
-    delay(10 * 1000);
-    requestImage();
+    currentState = RECEIVING_DATA;
   }
 }
 
-// Working and tested - No delays
 void handleHeader() {
   String input = Serial.readStringUntil('\n');
 
