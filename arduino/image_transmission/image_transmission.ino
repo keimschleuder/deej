@@ -7,10 +7,6 @@
 #define TFT_DC    2
 #define TFT_RST   3
 
-// Display dimensions in landscape mode
-#define DISPLAY_WIDTH  160
-#define DISPLAY_HEIGHT 128
-
 // Image dimensions (must match Go program)
 #define IMAGE_WIDTH  100
 #define IMAGE_HEIGHT 100
@@ -33,12 +29,9 @@ enum State {
 };
 
 State currentState = WAITING_FOR_HEADER;
-uint8_t headerIndex = 0;
 uint32_t imageSize = 0;
 uint32_t pixelsRecieved = 0;
 uint16_t currentLine = 0;
-uint16_t currentColumn = 0;
-bool firstImgByte = true;
 
 void setup() {
   Serial.begin(115200);
@@ -64,8 +57,6 @@ void setup() {
     delay(10);
   }
   
-  tft.setCursor(10, 10);
-  tft.println("USB connected!");
   delay(3000);
   
   tft.fillScreen(ST77XX_BLACK);
@@ -97,10 +88,7 @@ void receiveImageData(int iteration) {
   unsigned long start = millis();
   
   while(Serial.available() < 2) {
-    if (millis() - start > 3000) { // Timeout nach 3 Sekunden
-      tft.println("\nTIMEOUT!");
-      tft.print("Available: ");
-      tft.println(Serial.available());
+    if (millis() - start > 3000) {
       return; 
     }
   }
@@ -123,33 +111,15 @@ void drawLine() {
 
   pixelsRecieved += IMAGE_WIDTH;
   currentLine++;
-  
-  /* uint16_t color = ((uint16_t)lineBuffer[0] << 8) | lineBuffer[1];
-  tft.drawPixel(currentColumn + IMAGE_X, currentLine + IMAGE_Y, color);
-
-  currentColumn++;
-  pixelsRecieved++;
-  if (currentColumn >= IMAGE_WIDTH) {
-    currentColumn = 0;
-    currentLine++;
-  } */
 
   // Wenn es fertig ist
   if ((pixelsRecieved * 2) >= imageSize) {
     // Reset Variables
-    currentColumn = 0;
     currentLine = 0;
     pixelsRecieved = 0;
 
     currentState = WAITING_FOR_HEADER;
-    // TFT Logging (debugging only)
-    tft.setCursor(IMAGE_X, IMAGE_Y + IMAGE_HEIGHT + 5);
-    tft.println("Completed");
     delay(10 * 1000);
-    tft.fillRect(IMAGE_X, IMAGE_Y + IMAGE_HEIGHT + 5, 100, 10, ST77XX_BLACK);
-    delay(500);
-
-    // Request new image
     requestImage();
   }
 }
