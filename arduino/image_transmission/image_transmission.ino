@@ -12,8 +12,8 @@
 #define DISPLAY_HEIGHT 128
 
 // Image dimensions (must match Go program)
-#define IMAGE_WIDTH  25
-#define IMAGE_HEIGHT 25
+#define IMAGE_WIDTH  100
+#define IMAGE_HEIGHT 100
 
 // Position to display image
 #define IMAGE_X 30

@@ -19,8 +19,8 @@ const (
 	SERIAL_PORT = "COM9"
 	BAUD_RATE   = 115200
 
-	TARGET_WIDTH  = 25
-	TARGET_HEIGHT = 25
+	TARGET_WIDTH  = 100
+	TARGET_HEIGHT = 100
 
 	imagePath = `C:\Users\nikla\Documents\GitHub\deej\arduino\image_transmission\image.jpg`
 )
