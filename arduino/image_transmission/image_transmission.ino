@@ -84,14 +84,16 @@ void loop() {
         break;
         
       case RECEIVING_IMAGE:
-        receiveImageData();
+        for (int i = 0; i < IMAGE_WIDTH; i++) {
+          receiveImageData(i);
+        }
         drawLine();
         break;
     }
   }
 }
 
-void receiveImageData() {
+void receiveImageData(int iteration) {
   unsigned long start = millis();
   
   while(Serial.available() < 2) {
@@ -103,7 +105,7 @@ void receiveImageData() {
     }
   }
 
-  for(int i=0; i<2; i++) {
+  for(int i=iteration * 2; i < (iteration * 2) + 2; i++) {
     lineBuffer[i] = Serial.read();
   }
 }
@@ -111,17 +113,18 @@ void receiveImageData() {
 void drawLine() {
   delay(100);
   
-  /* uint16_t* colorBuffer = (uint16_t*)lineBuffer;
+  uint16_t* colorBuffer = (uint16_t*)lineBuffer;
   
-  for (uint16_t x = 0; x < 1; x++) {
+  for (uint16_t x = 0; x < IMAGE_WIDTH; x++) {
     uint16_t bufferIndex = x * 2;
     colorBuffer[x] = ((uint16_t)lineBuffer[bufferIndex] << 8) | lineBuffer[bufferIndex + 1];
   }
   tft. drawRGBBitmap(IMAGE_X, IMAGE_Y + currentLine, colorBuffer, IMAGE_WIDTH, 1);
 
-  pixelsRecieved += IMAGE_WIDTH; */
+  pixelsRecieved += IMAGE_WIDTH;
+  currentLine++;
   
-  uint16_t color = ((uint16_t)lineBuffer[0] << 8) | lineBuffer[1];
+  /* uint16_t color = ((uint16_t)lineBuffer[0] << 8) | lineBuffer[1];
   tft.drawPixel(currentColumn + IMAGE_X, currentLine + IMAGE_Y, color);
 
   currentColumn++;
@@ -129,7 +132,7 @@ void drawLine() {
   if (currentColumn >= IMAGE_WIDTH) {
     currentColumn = 0;
     currentLine++;
-  }
+  } */
 
   // Wenn es fertig ist
   if ((pixelsRecieved * 2) >= imageSize) {
