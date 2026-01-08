@@ -74,18 +74,6 @@ void setup() {
 
 bool sizeReadSuccessful = false;
 
-/* bool sizeReadAttempted = false;
-void loop() {
-  if (!sizeReadAttempted && Serial.available() > 0) {
-    handleSize();
-    sizeReadAttempted = true;
-  } else if (sizeReadSuccessful) {
-    tft.fillScreen(ST77XX_GREEN);
-  } else {
-    tft.fillScreen(ST77XX_RED);
-  }
-} */
-
 void loop() {
   while (Serial.available() > 0) {
     switch (currentState) {
