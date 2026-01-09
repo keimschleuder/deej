@@ -90,24 +90,12 @@ func main() {
 		if strings.HasPrefix(line, "REQ") {
 			log.Println("\n=== Image requested by Arduino ===")
 			trackInfo, err := getCurrentTrackArtwork()
+			if err != nil {
+				fmt.Errorf("Error to read Track Info", err)
+			}
 			log.Println("Got Track Data")
 			if trackInfo.Name != lastTrackInfo.Name || line == "REQ:NEW" {
-				err = sendImage(port)
-				if err != nil {
-					log.Printf("Error sending image: %v", err)
-				} else {
-					log.Println("Image sent successfully!")
-				}
-
-				title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
-				serialMessage := title + "\t" + artist + "\n"
-				_, err = port.Write([]byte(serialMessage))
-				if err != nil {
-					log.Printf("Error sending image: %v", err)
-				} else {
-					log.Println("Trackdata sent successfully!")
-				}
-
+				handleImageSend(port, trackInfo)
 				lastTrackInfo = trackInfo
 			} else {
 				log.Println("Track Data was the Same")
@@ -116,6 +104,24 @@ func main() {
 
 		}
 
+	}
+}
+
+func handleImageSend(port io.ReadWriteCloser, trackInfo TrackInfo) {
+	err := sendImage(port)
+	if err != nil {
+		log.Printf("Error sending image: %v", err)
+	} else {
+		log.Println("Image sent successfully!")
+	}
+
+	title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
+	serialMessage := title + "\t" + artist + "\n"
+	_, err = port.Write([]byte(serialMessage))
+	if err != nil {
+		log.Printf("Error sending image: %v", err)
+	} else {
+		log.Println("Trackdata sent successfully!")
 	}
 }
 

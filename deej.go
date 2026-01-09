@@ -144,11 +144,11 @@ func main() {
 	// Start processing received messages (always run to drain channel)
 	go processMessages(msgChan)
 
-	currentWindowSlider := getSliderNumberForTarget("deej.current")
+	// currentWindowSlider := getSliderNumberForTarget("deej.current")
 	// Check for changes in the current window
-	if currentWindowSlider >= 0 {
+	/* if currentWindowSlider >= 0 {
 		go TrackCurrentProcessChanges(port, currentWindowSlider)
-	}
+	} */
 
 	go TrackVolumeChanges(port, time.Second)
 
@@ -276,11 +276,31 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 			}
 		} else if line == "PONG" {
 			fmt.Println("[Arduino] PONG received")
-		} else if line == "REQ" {
+		} else if strings.HasPrefix(line, "REQ") {
+			sendingImage = true
 			if verbose {
 				fmt.Println("[Arduino] REQ received")
 			}
-			handleImageSend(port)
+
+			trackInfo, err := getCurrentTrackArtwork()
+			if err != nil {
+				fmt.Errorf("Error to read Track Info", err)
+			}
+			if verbose {
+				log.Println("Got Track Data")
+			}
+
+			if trackInfo.Name != lastTrackInfo.Name || line == "REQ:NEW" {
+				handleImageSend(port, trackInfo)
+				lastTrackInfo = trackInfo
+			} else {
+				if verbose {
+					log.Println("Track Data was the Same")
+				}
+				port.Write([]byte{'N', 'I', 'L', '\n'})
+			}
+
+			sendingImage = false
 		} else {
 			lastUserActivity = time.Now()
 			// Parse sensor data: s0v75|b1v1
@@ -397,7 +417,8 @@ func getCurrentProcessName() (string, error) {
 	return syscall.UTF16ToString(buf), nil
 }
 
-func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
+// Check, whether this is necessary
+/* func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
 	for {
 		processName, err := getCurrentProcessName()
 		if err != nil {
@@ -416,7 +437,7 @@ func TrackCurrentProcessChanges(port io.ReadWriteCloser, slider int) {
 			lastForegroundWindowName = processName
 		}
 	}
-}
+} */
 
 func TrackVolumeChanges(port io.ReadWriteCloser, interval time.Duration) {
 	for {
@@ -469,7 +490,7 @@ func TrackVolumeChanges(port io.ReadWriteCloser, interval time.Duration) {
 					lastSliderValues[sliderNum] = currentVolume
 
 					if verbose {
-						fmt.Printf("[Sync] Slider %d updated to %d%%\n", sliderNum, currentVolume)
+						log.Printf("[Sync] Slider %d updated to %d%%\n", sliderNum, currentVolume)
 					}
 				}
 			}
@@ -657,9 +678,6 @@ func getSystemVolume() int {
 	}
 
 	percent := int(vol * 100)
-	if verbose {
-		fmt.Printf("[Volume] Current volume: %d%%\n", percent)
-	}
 	return percent
 }
 
@@ -1123,26 +1141,13 @@ func sendCommand(port io.ReadWriteCloser, command string) {
 	}
 
 	if verbose {
-		fmt.Printf("[Sent %d bytes] %s\n", n, strings.TrimSpace(command))
+		log.Printf("[Sent %d bytes] %s\n", n, strings.TrimSpace(command))
 	}
 }
 
 // Image Sender Code
-func handleImageSend(port io.ReadWriteCloser) {
-	sendingImage = true
-
-	trackInfo, err := getCurrentTrackArtwork()
-	if trackInfo != lastTrackInfo {
-		lastTrackInfo = trackInfo
-	}
-	if err != nil {
-		fmt.Errorf("Error to read Track Info", err)
-	}
-	if verbose {
-		log.Println("Got Track Data")
-	}
-
-	err = sendImage(port)
+func handleImageSend(port io.ReadWriteCloser, trackInfo TrackInfo) {
+	err := sendImage(port)
 	if err != nil {
 		log.Printf("Error sending image: %v", err)
 	} else {
@@ -1157,8 +1162,6 @@ func handleImageSend(port io.ReadWriteCloser) {
 	} else if verbose {
 		log.Println("Trackdata sent successfully!")
 	}
-
-	sendingImage = false
 }
 
 func processTrackInfo(title string, artist string) (string, string) {

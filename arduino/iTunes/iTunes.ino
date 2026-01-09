@@ -70,10 +70,7 @@ void setup() {
 
 void loop() {
   if (currentState == IDLE) {
-    unsigned long now = millis();    
-    unsigned long diff = now - lastImageRequest;  
-
-    if (diff >= imageRequestInterval) {
+    if (millis() - lastImageRequest >= imageRequestInterval) {
       requestImage();
     }
   }
