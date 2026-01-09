@@ -977,9 +977,9 @@ func getApplicationVolume(processName string) int {
 		sessionControl.Release()
 	}
 
-	if verbose {
+	/*	if verbose {
 		log.Printf("Application %s not found or not playing audio", processName)
-	}
+	} */
 	return -1
 }
 
@@ -1164,7 +1164,7 @@ func handleImageSend(port io.ReadWriteCloser) {
 func processTrackInfo(title string, artist string) (string, string) {
 	title = strings.TrimSpace(title)
 	artist = strings.TrimSpace(artist)
-	if strings.Index(title, "(") > 3 {
+	if strings.Index(title, "(") > 3 && strings.Index(title, "[") != 0 {
 		title = title[0:strings.Index(title, "(")]
 	}
 	if strings.Index(title, "-") > 12 {

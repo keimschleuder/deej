@@ -18,21 +18,26 @@
 // Create display object
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
+const long imageRequestInterval = 10000;
+
 // Buffer for one line of RGB565 data (100 pixels * 2 bytes)
 uint8_t lineBuffer[IMAGE_WIDTH * 2];
 
 // Communication state
 enum State {
+  IDLE,
   WAITING_FOR_HEADER,
   READING_SIZE,
   RECEIVING_IMAGE,
   RECEIVING_DATA
 };
 
-State currentState = WAITING_FOR_HEADER;
+State currentState = IDLE;
 uint32_t imageSize = 0;
 uint32_t pixelsRecieved = 0;
 uint16_t currentLine = 0;
+bool imageOnScreen = false;
+unsigned long lastImageRequest = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -61,10 +66,19 @@ void setup() {
   delay(3000);
   
   tft.fillScreen(ST77XX_BLACK);
-  requestImage();
 }
 
 void loop() {
+  if (currentState == IDLE) {
+    unsigned long now = millis();    
+    unsigned long diff = now - lastImageRequest;  
+
+    if (diff >= imageRequestInterval) {
+      requestImage();
+    }
+  }
+
+  // For other states, wait for serial data
   while (Serial.available() > 0) {
     switch (currentState) {
       case WAITING_FOR_HEADER:
@@ -122,9 +136,8 @@ void handleData() {
   tft.setTextColor(46582);
   tft.println(artist);
 
-  currentState = WAITING_FOR_HEADER;
-  delay(10 * 1000);
-  requestImage();
+  currentState = IDLE;
+  imageOnScreen = true;
 }
 
 void receiveImageData(int iteration) {
@@ -167,9 +180,12 @@ void drawLine() {
 
 void handleHeader() {
   String input = Serial.readStringUntil('\n');
+  input.trim();
 
-  if (input == 'IMG') {
+  if (input == "IMG") {
     currentState = READING_SIZE;
+  } else if (input == "NIL") {
+    currentState = IDLE;
   }
 }
 
@@ -203,5 +219,11 @@ void handleSize() {
 }
 
 void requestImage() {
-  Serial.print("REQ\n");
+  if (imageOnScreen) {
+    Serial.print("REQ\n");
+  } else {
+    Serial.print("REQ:NEW\n");
+  }
+  lastImageRequest = millis();
+  currentState = WAITING_FOR_HEADER;
 }

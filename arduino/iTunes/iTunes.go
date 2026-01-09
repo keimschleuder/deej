@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"image"
@@ -77,50 +78,44 @@ func main() {
 
 	log.Println("Listening for image requests...")
 
-	// Listen for requests from Arduino
-	requestBuffer := make([]byte, 4)
-	requestIndex := 0
-
 	for {
-		n, err := port.Read(buf)
+		reader := bufio.NewReader(port)
+		line, err := reader.ReadString('\n')
 		if err != nil {
-			log.Printf("Read error: %v", err)
+			log.Printf("Error reading from Arduino: %v", err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
-		for i := 0; i < n; i++ {
-			requestBuffer[requestIndex] = buf[i]
-			requestIndex++
-
-			if requestIndex >= 4 {
-				// Check for request command "REQ\n"
-				if requestBuffer[0] == 'R' && requestBuffer[1] == 'E' && requestBuffer[2] == 'Q' && requestBuffer[3] == '\n' {
-					log.Println("\n=== Image requested by Arduino ===")
-					trackInfo, err := getCurrentTrackArtwork()
-					if trackInfo != lastTrackInfo {
-						lastTrackInfo = trackInfo
-					}
-					log.Println("Got Track Data")
-					err = sendImage(port)
-					if err != nil {
-						log.Printf("Error sending image: %v", err)
-					} else {
-						log.Println("Image sent successfully!")
-					}
-
-					title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
-					serialMessage := title + "\t" + artist + "\n"
-					_, err = port.Write([]byte(serialMessage))
-					if err != nil {
-						log.Printf("Error sending image: %v", err)
-					} else {
-						log.Println("Trackdata sent successfully!")
-					}
+		if strings.HasPrefix(line, "REQ") {
+			log.Println("\n=== Image requested by Arduino ===")
+			trackInfo, err := getCurrentTrackArtwork()
+			log.Println("Got Track Data")
+			if trackInfo.Name != lastTrackInfo.Name || line == "REQ:NEW" {
+				err = sendImage(port)
+				if err != nil {
+					log.Printf("Error sending image: %v", err)
+				} else {
+					log.Println("Image sent successfully!")
 				}
-				requestIndex = 0
+
+				title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
+				serialMessage := title + "\t" + artist + "\n"
+				_, err = port.Write([]byte(serialMessage))
+				if err != nil {
+					log.Printf("Error sending image: %v", err)
+				} else {
+					log.Println("Trackdata sent successfully!")
+				}
+
+				lastTrackInfo = trackInfo
+			} else {
+				log.Println("Track Data was the Same")
+				port.Write([]byte{'N', 'I', 'L', '\n'})
 			}
+
 		}
+
 	}
 }
 
