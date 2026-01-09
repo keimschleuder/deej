@@ -16,6 +16,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/go-ole/go-ole"
@@ -23,16 +25,25 @@ import (
 	"github.com/itchyny/volume-go"
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/micmonay/keybd_event"
-	"github.com/moutend/go-wca"
+	"github.com/moutend/go-wca/pkg/wca"
 	"github.com/nfnt/resize"
 	"github.com/spf13/viper"
 	"golang.org/x/sys/windows"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 type ArduinoMessage struct {
 	Timestamp    time.Time
 	SliderValues map[int]int
 	ButtonStates map[int]bool
+}
+
+type TrackInfo struct {
+	Name   string
+	Artist string
+	Album  string
 }
 
 const (
@@ -44,15 +55,12 @@ const (
 	configKeyCOMPort       = "com_port"
 	configKeyBaudRate      = "baud_rate"
 	defaultCOMPort         = "COM9"
-	defaultBaudRate        = 9600
-
-	SERIAL_PORT = "COM9"
-	BAUD_RATE   = 115200
+	defaultBaudRate        = 115200
 
 	TARGET_WIDTH  = 100
 	TARGET_HEIGHT = 100
 
-	imagePath = `C:\Users\nikla\Documents\GitHub\deej\arduino\iTunes\itunes_artwork.jpg`
+	imagePath = `C:\Users\nikla\Documents\GitHub\deej\\itunes_artwork.jpg`
 )
 
 var (
@@ -72,13 +80,10 @@ var (
 	lastForegroundWindowName string
 	lastSliderValues         []int
 	lastUserActivity         time.Time
-)
+	lastTrackInfo            TrackInfo
 
-type TrackInfo struct {
-	Name   string
-	Artist string
-	Album  string
-}
+	sendingImage = false
+)
 
 func main() {
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose output (shows all messages)")
@@ -271,6 +276,11 @@ func readFromArduino(port io.ReadWriteCloser, msgChan chan<- ArduinoMessage) {
 			}
 		} else if line == "PONG" {
 			fmt.Println("[Arduino] PONG received")
+		} else if line == "REQ" {
+			if verbose {
+				fmt.Println("[Arduino] REQ received")
+			}
+			handleImageSend(port)
 		} else {
 			lastUserActivity = time.Now()
 			// Parse sensor data: s0v75|b1v1
@@ -1099,6 +1109,12 @@ func handleUserInput(port io.ReadWriteCloser) {
 }
 
 func sendCommand(port io.ReadWriteCloser, command string) {
+	for {
+		if !sendingImage {
+			break
+		}
+	}
+
 	message := command + "\n"
 	n, err := port.Write([]byte(message))
 	if err != nil {
@@ -1111,24 +1127,85 @@ func sendCommand(port io.ReadWriteCloser, command string) {
 	}
 }
 
-func printHelp() {
-	fmt.Println("\n=== Available Commands ===")
-	fmt.Println("  set <slider> <percentage>  - Set specific slider to percentage")
-	fmt.Println("  ping                       - Ping Arduino")
-	fmt.Println("  help                       - Show this help")
-	fmt.Println("  quit/exit/q                - Exit program")
-	fmt.Println("\nSlider Mapping:")
-	for _, num := range sliderMapping {
-		targets := getSliderTargets(num)
-		fmt.Printf("  Slider %d -> %s\n", num, strings.Join(targets, ", "))
+// Image Sender Code
+func handleImageSend(port io.ReadWriteCloser) {
+	sendingImage = true
+
+	trackInfo, err := getCurrentTrackArtwork()
+	if trackInfo != lastTrackInfo {
+		lastTrackInfo = trackInfo
 	}
-	fmt.Println("========================")
+	if err != nil {
+		fmt.Errorf("Error to read Track Info", err)
+	}
+	if verbose {
+		log.Println("Got Track Data")
+	}
+
+	err = sendImage(port)
+	if err != nil {
+		log.Printf("Error sending image: %v", err)
+	} else {
+		log.Println("Image sent successfully!")
+	}
+
+	title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
+	serialMessage := title + "\t" + artist + "\n"
+	_, err = port.Write([]byte(serialMessage))
+	if err != nil {
+		log.Printf("Error sending image: %v", err)
+	} else if verbose {
+		log.Println("Trackdata sent successfully!")
+	}
+
+	sendingImage = false
 }
 
-// Image Sender Code
+func processTrackInfo(title string, artist string) (string, string) {
+	title = strings.TrimSpace(title)
+	artist = strings.TrimSpace(artist)
+	if strings.Index(title, "(") > 3 {
+		title = title[0:strings.Index(title, "(")]
+	}
+	if strings.Index(title, "-") > 12 {
+		title = title[0:strings.Index(title, "-")]
+	}
+	if utf8.RuneCountInString(title) > 52 {
+		title = title[0:50] + ".."
+	}
+
+	if utf8.RuneCountInString(artist) > 26 {
+		artist = artist[0:24] + ".."
+	}
+
+	title = RemoveSpecialChars(title)
+	artist = RemoveSpecialChars(artist)
+
+	return title, artist
+}
+
+func RemoveSpecialChars(s string) string {
+	// First, handle German umlauts specifically
+	replacer := strings.NewReplacer(
+		"ä", "a", "Ä", "A",
+		"ö", "o", "Ö", "O",
+		"ü", "u", "Ü", "U",
+		"ß", "ss",
+	)
+	s = replacer.Replace(s)
+
+	// Then remove accents from other characters
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, _ := transform.String(t, s)
+
+	return result
+}
+
 func sendImage(port io.ReadWriteCloser) error {
 	// Read the image file
-	log.Printf("Reading image from:  %s", imagePath)
+	if verbose {
+		log.Printf("Reading image from:  %s", imagePath)
+	}
 	imageData, err := os.ReadFile(imagePath)
 	if err != nil {
 		return fmt.Errorf("failed to read image file: %v", err)
@@ -1139,19 +1216,27 @@ func sendImage(port io.ReadWriteCloser) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode image: %v", err)
 	}
-	log.Printf("Decoded %s image:  %dx%d", format, img.Bounds().Dx(), img.Bounds().Dy())
+	if verbose {
+		log.Printf("Decoded %s image:  %dx%d", format, img.Bounds().Dx(), img.Bounds().Dy())
+	}
 
 	// Resize image
-	log.Printf("Resizing to %dx%d.. .", TARGET_WIDTH, TARGET_HEIGHT)
+	if verbose {
+		log.Printf("Resizing to %dx%d.. .", TARGET_WIDTH, TARGET_HEIGHT)
+	}
 	resized := resize.Resize(TARGET_WIDTH, TARGET_HEIGHT, img, resize.Lanczos3)
 
 	// Convert to RGB565 data
 	rgb565Data := imageToRGB565(resized)
-	log.Printf("RGB565 data size:  %d bytes", len(rgb565Data))
+	if verbose {
+		log.Printf("RGB565 data size:  %d bytes", len(rgb565Data))
+	}
 
 	// Send header: "IMG\n"
 	header := []byte{'I', 'M', 'G', '\n'}
-	log.Println("Sending header...")
+	if verbose {
+		log.Println("Sending header...")
+	}
 	_, err = port.Write(header)
 	if err != nil {
 		return fmt.Errorf("failed to write header: %v", err)
@@ -1160,20 +1245,26 @@ func sendImage(port io.ReadWriteCloser) error {
 	// Send size as 4 bytes
 	size := uint32(len(rgb565Data))
 	sizeBytes := []byte{byte(size >> 24), byte(size >> 16), byte(size >> 8), byte(size)}
-	log.Println("Sending size...")
+	if verbose {
+		log.Println("Sending size...")
+	}
 
 	_, err = port.Write(sizeBytes)
 	if err != nil {
 		return fmt.Errorf("failed to write size: %v", err)
 	}
 
-	log.Println("Sending Image data")
+	if verbose {
+		log.Println("Sending Image data")
+	}
 
 	_, err = port.Write(rgb565Data)
 	if err != nil {
 		return fmt.Errorf("Failed to Send the Image Data: %v", err)
 	}
-	log.Println("All Data sent")
+	if verbose {
+		log.Println("All Data sent")
+	}
 
 	return nil
 }
@@ -1286,4 +1377,18 @@ func getCurrentTrackArtwork() (TrackInfo, error) {
 	ole.CoUninitialize()
 
 	return trackInfo, nil
+}
+
+func printHelp() {
+	fmt.Println("\n=== Available Commands ===")
+	fmt.Println("  set <slider> <percentage>  - Set specific slider to percentage")
+	fmt.Println("  ping                       - Ping Arduino")
+	fmt.Println("  help                       - Show this help")
+	fmt.Println("  quit/exit/q                - Exit program")
+	fmt.Println("\nSlider Mapping:")
+	for _, num := range sliderMapping {
+		targets := getSliderTargets(num)
+		fmt.Printf("  Slider %d -> %s\n", num, strings.Join(targets, ", "))
+	}
+	fmt.Println("========================")
 }

@@ -127,7 +127,7 @@ func main() {
 func processTrackInfo(title string, artist string) (string, string) {
 	title = strings.TrimSpace(title)
 	artist = strings.TrimSpace(artist)
-	if strings.Index(title, "(") > 5 {
+	if strings.Index(title, "(") > 3 {
 		title = title[0:strings.Index(title, "(")]
 	}
 	if strings.Index(title, "-") > 12 {
