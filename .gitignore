@@ -12,4 +12,4 @@ releases/
 *.bin
 logs/
 preferences.yaml
-arduino/iTunes/itunes_artwork.jpg
+*/itunes_artwork.jpg
