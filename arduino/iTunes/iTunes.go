@@ -9,12 +9,18 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/nfnt/resize"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -103,7 +109,8 @@ func main() {
 						log.Println("Image sent successfully!")
 					}
 
-					serialMessage := trackInfo.Name + "\t" + trackInfo.Artist + "\n"
+					title, artist := processTrackInfo(trackInfo.Name, trackInfo.Artist)
+					serialMessage := title + "\t" + artist + "\n"
 					_, err = port.Write([]byte(serialMessage))
 					if err != nil {
 						log.Printf("Error sending image: %v", err)
@@ -115,6 +122,46 @@ func main() {
 			}
 		}
 	}
+}
+
+func processTrackInfo(title string, artist string) (string, string) {
+	title = strings.TrimSpace(title)
+	artist = strings.TrimSpace(artist)
+	if strings.Index(title, "(") > 5 {
+		title = title[0:strings.Index(title, "(")]
+	}
+	if strings.Index(title, "-") > 12 {
+		title = title[0:strings.Index(title, "-")]
+	}
+	if utf8.RuneCountInString(title) > 52 {
+		title = title[0:50] + ".."
+	}
+
+	if utf8.RuneCountInString(artist) > 26 {
+		artist = artist[0:24] + ".."
+	}
+
+	title = RemoveSpecialChars(title)
+	artist = RemoveSpecialChars(artist)
+
+	return title, artist
+}
+
+func RemoveSpecialChars(s string) string {
+	// First, handle German umlauts specifically
+	replacer := strings.NewReplacer(
+		"ä", "a", "Ä", "A",
+		"ö", "o", "Ö", "O",
+		"ü", "u", "Ü", "U",
+		"ß", "ss",
+	)
+	s = replacer.Replace(s)
+
+	// Then remove accents from other characters
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, _ := transform.String(t, s)
+
+	return result
 }
 
 func sendImage(port io.ReadWriteCloser) error {

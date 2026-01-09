@@ -100,12 +100,6 @@ void handleData() {
   tft.fillRect(0, IMAGE_Y + IMAGE_HEIGHT, tft.width(), 28, ST77XX_BLACK);
 
   uint8_t titleSize = 2;
-  if (title.indexOf('(', 5)){
-    title = title.substring(0, title.indexOf('(', 5) - 1);
-  }
-  if (title.indexOf('-', 12)){
-    title = title.substring(0, title.indexOf('-', 12) - 1);
-  }
   if (title.length() > 10) {
     titleSize = 1;
   }
@@ -114,9 +108,6 @@ void handleData() {
     start_x_title = IMAGE_X;
   }
 
-  if (artist.length() >= 26) {
-    artist = artist.substring(0, 24) + "..";
-  }
   uint8_t start_x_artist = IMAGE_X;
   if (artist.length() > 20) {
     start_x_artist = 0;
@@ -136,7 +127,6 @@ void handleData() {
   requestImage();
 }
 
-// Working and tested
 void receiveImageData(int iteration) {
   unsigned long start = millis();
   
