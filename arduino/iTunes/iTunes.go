@@ -24,6 +24,10 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+var (
+	lastSendSuccessful bool
+)
+
 const (
 	SERIAL_PORT = "COM13"
 	BAUD_RATE   = 115200
@@ -93,8 +97,10 @@ func main() {
 			trackInfo, err := getCurrentTrackArtwork()
 			if err != nil {
 				log.Printf("Error to read Track Info: %v", err)
+				log.Printf("Continuing anyway")
 
-				if strings.HasPrefix(line, "REQ:NEW") {
+				if strings.HasPrefix(line, "REQ:NEW") || lastSendSuccessful {
+					lastSendSuccessful = false
 					sendImage(port, idlePath)
 
 					serialMessage := "Nothing playing\t \n"
@@ -111,6 +117,7 @@ func main() {
 			if trackInfo.Name != lastTrackInfo.Name || strings.HasPrefix(line, "REQ:NEW") {
 				handleImageSend(port, trackInfo)
 				lastTrackInfo = trackInfo
+				lastSendSuccessful = true
 			} else {
 				log.Println("Track Data was the Same")
 				port.Write([]byte{'N', 'I', 'L', '\n'})
