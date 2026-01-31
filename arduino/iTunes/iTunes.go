@@ -25,13 +25,14 @@ import (
 )
 
 const (
-	SERIAL_PORT = "COM9"
+	SERIAL_PORT = "COM13"
 	BAUD_RATE   = 115200
 
 	TARGET_WIDTH  = 100
 	TARGET_HEIGHT = 100
 
 	imagePath = `C:\Users\nikla\Documents\GitHub\deej\arduino\iTunes\itunes_artwork.jpg`
+	idlePath  = `C:\Users\nikla\Documents\GitHub\deej\music.jpg`
 )
 
 type TrackInfo struct {
@@ -91,10 +92,23 @@ func main() {
 			log.Println("\n=== Image requested by Arduino ===")
 			trackInfo, err := getCurrentTrackArtwork()
 			if err != nil {
-				fmt.Errorf("Error to read Track Info", err)
+				log.Printf("Error to read Track Info: %v", err)
+
+				if strings.HasPrefix(line, "REQ:NEW") {
+					sendImage(port, idlePath)
+
+					serialMessage := "Nothing playing\t \n"
+					_, err = port.Write([]byte(serialMessage))
+					if err != nil {
+						log.Printf("Error sending image: %v", err)
+					} else {
+						log.Println("Trackdata sent successfully!")
+					}
+					continue
+				}
 			}
 			log.Println("Got Track Data")
-			if trackInfo.Name != lastTrackInfo.Name || line == "REQ:NEW" {
+			if trackInfo.Name != lastTrackInfo.Name || strings.HasPrefix(line, "REQ:NEW") {
 				handleImageSend(port, trackInfo)
 				lastTrackInfo = trackInfo
 			} else {
@@ -108,7 +122,7 @@ func main() {
 }
 
 func handleImageSend(port io.ReadWriteCloser, trackInfo TrackInfo) {
-	err := sendImage(port)
+	err := sendImage(port, imagePath)
 	if err != nil {
 		log.Printf("Error sending image: %v", err)
 	} else {
@@ -165,10 +179,10 @@ func RemoveSpecialChars(s string) string {
 	return result
 }
 
-func sendImage(port io.ReadWriteCloser) error {
+func sendImage(port io.ReadWriteCloser, path string) error {
 	// Read the image file
-	log.Printf("Reading image from:  %s", imagePath)
-	imageData, err := os.ReadFile(imagePath)
+	log.Printf("Reading image from:  %s", path)
+	imageData, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read image file: %v", err)
 	}
@@ -279,6 +293,9 @@ func getCurrentTrackArtwork() (TrackInfo, error) {
 	}
 
 	track := currentTrack.ToIDispatch()
+	if track == nil {
+		return TrackInfo{}, fmt.Errorf("failed to convert current track to IDispatch")
+	}
 
 	// Get track info
 	trackInfo := TrackInfo{}
@@ -300,6 +317,9 @@ func getCurrentTrackArtwork() (TrackInfo, error) {
 	defer artworks.Clear()
 
 	artworkCollection := artworks.ToIDispatch()
+	if artworkCollection == nil {
+		return trackInfo, nil
+	}
 
 	// Get artwork count
 	count, err := oleutil.GetProperty(artworkCollection, "Count")

@@ -46,11 +46,11 @@ void setup() {
   tft.initR(INITR_BLACKTAB);
   
   // Set rotation to landscape mode
-  tft. setRotation(1);
+  tft.setRotation(1);
   tft.setSPISpeed(8000000);
   
   // Clear screen
-  tft. fillScreen(ST77XX_BLACK);
+  tft.fillScreen(ST77XX_BLACK);
   
   // Display startup message
   tft.setTextColor(ST77XX_WHITE);
