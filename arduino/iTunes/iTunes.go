@@ -29,7 +29,7 @@ var (
 )
 
 const (
-	SERIAL_PORT = "COM13"
+	SERIAL_PORT = "COM9"
 	BAUD_RATE   = 115200
 
 	TARGET_WIDTH  = 100
@@ -103,7 +103,7 @@ func main() {
 					lastSendSuccessful = false
 					sendImage(port, idlePath)
 
-					serialMessage := "Nothing playing\t \n"
+					serialMessage := "Keine Wiedergabe\t \n"
 					_, err = port.Write([]byte(serialMessage))
 					if err != nil {
 						log.Printf("Error sending image: %v", err)
