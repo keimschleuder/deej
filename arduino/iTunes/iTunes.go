@@ -122,9 +122,7 @@ func main() {
 				log.Println("Track Data was the Same")
 				port.Write([]byte{'N', 'I', 'L', '\n'})
 			}
-
 		}
-
 	}
 }
 
