@@ -1,5 +1,5 @@
 # In this fork
-  I want to add the possibility to add a 7-segment display and a normal display via I²C. This is all work in progress.
+  I want to add a color display via SPI. This is all work in progress.
 
   The Repo I forked added Button support. Those Buttons must be defined in config with int values. The key values can be found here: https://github.com/micmonay/keybd_event/blob/master/keybd_windows.go (make sure to convert hex values to int)
 
@@ -13,6 +13,8 @@
 
 I use [this programm to mute the current window](https://github.com/tfourj/MuteActiveWindow). Thy have detailled instuctions on how to install it. Make shure to set the hotkey to F13.
 Also make it [run on startup](https://stackoverflow.com/questions/41723490/how-to-build-ahk-scripts-automatically-on-startup).
+
+ Download the latest release and let the code run, where it belongs. (Detailled instructions on that will follow, when the project is finished)
 
 # Case files from Miodec
 
